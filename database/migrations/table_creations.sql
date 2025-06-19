@@ -5,43 +5,57 @@ CREATE TYPE payroll_periods_status AS ENUM ('open', 'closed');
 -- Users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    password_hash TEXT NOT NULL,
-    salary NUMERIC(10, 2) DEFAULT 0,
+    username VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    password TEXT NOT NULL,
     role user_role NOT NULL
 );
 
+CREATE TABLE user_salaries (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount NUMERIC(10, 2) NOT NULL,
+    effective_from DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Attendance table
-CREATE TABLE attendances (
+CREATE TABLE employee_attendances (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date DATE NOT NULL,
-    check_in_time TIMESTAMP,
-    check_out_time TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    check_in_time TIMESTAMP NOT NULL,
+    check_out_time TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, date)
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(255) NOT NULL,
+    UNIQUE (user_id, date)
 );
 
 -- Overtime table
-CREATE TABLE overtimes (
+CREATE TABLE employee_overtimes (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     durations INT NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(255) NOT NULL,
     UNIQUE(user_id, date)
 );
 
 -- Reimbursements table
-CREATE TABLE reimbursements (
+CREATE TABLE employee_reimbursements (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     amount NUMERIC(10, 2) DEFAULT 0,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(255) NOT NULL,
     description TEXT
 );
 
@@ -55,7 +69,7 @@ CREATE TABLE payroll_periods (
 );
 
 -- Payslips table
-CREATE TABLE payslips (
+CREATE TABLE payroll_payslips (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     payroll_period_id INT NOT NULL REFERENCES payroll_periods(id) ON DELETE CASCADE,
@@ -66,5 +80,6 @@ CREATE TABLE payslips (
     reimbursement_total NUMERIC(10, 2) NOT NULL,
     total_take_home NUMERIC(10, 2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) NOT NULL,
     UNIQUE(user_id, payroll_period_id)
 );

@@ -10,7 +10,7 @@ const (
 )
 
 type PayrollPeriod struct {
-	ID          uint                `gorm:"primaryKey" json:"id"`
+	ID          int64               `gorm:"primaryKey" json:"id"`
 	PeriodStart time.Time           `gorm:"type:date;not null" json:"period_start"`
 	PeriodEnd   time.Time           `gorm:"type:date;not null" json:"period_end"`
 	Status      PayrollPeriodStatus `gorm:"type:payroll_periods_status;default:'open'" json:"status"`

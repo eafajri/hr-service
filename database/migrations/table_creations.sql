@@ -64,7 +64,12 @@ CREATE TABLE payroll_periods (
     id SERIAL PRIMARY KEY,
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
+    working_days INT NOT NULL,
     status payroll_periods_status DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(255) NOT NULL,
     UNIQUE(period_start, period_end)
 );
 
@@ -75,6 +80,8 @@ CREATE TABLE payroll_payslips (
     payroll_period_id INT NOT NULL REFERENCES payroll_periods(id) ON DELETE CASCADE,
     base_salary NUMERIC(10, 2) NOT NULL,
     attendance_days INT NOT NULL,
+    attendance_hours INT NOT NULL,
+    attendance_pay NUMERIC(10, 2) NOT NULL,
     overtime_hours INT NOT NULL,
     overtime_pay NUMERIC(10, 2) NOT NULL,
     reimbursement_total NUMERIC(10, 2) NOT NULL,

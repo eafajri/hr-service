@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/eafajri/hr-service.git/module/employee/internal/entity"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -41,4 +43,10 @@ func (r *EmployeeRepositoryImpl) UpsertReimbursement(reimbursement entity.Employ
 			"amount", "description", "updated_at", "updated_by",
 		}),
 	}).Create(&reimbursement).Error
+}
+
+func (r *EmployeeRepositoryImpl) GetAttendanceByUserIDAndDate(userID int64, date time.Time) (entity.EmployeeAttendance, error) {
+	var attendance entity.EmployeeAttendance
+	err := r.DB.Where("user_id = ? AND date = ?", userID, date).First(&attendance).Error
+	return attendance, err
 }

@@ -42,3 +42,20 @@ func (r *PayrollRepositoryImpl) ClosePayrollPeriod(periodID int64) error {
 func (r *PayrollRepositoryImpl) CreatePayslipsByPeriod(payslips []entity.PayrollPayslip) error {
 	return r.DB.CreateInBatches(payslips, 100).Error
 }
+
+func (r *PayrollRepositoryImpl) GetEmployeeBaseSalaryByPeriodID(periodID int64) ([]entity.EmployeeBaseSalary, error) {
+	var salaries []entity.EmployeeBaseSalary
+
+	query := `
+		SELECT DISTINCT ON (us.user_id) 
+			us.user_id, us.amount
+		FROM users_salaries us
+		JOIN payroll_periods pp ON pp.id = ?
+		WHERE us.effective_from <= pp.period_start
+		ORDER BY us.user_id, us.effective_from DESC;
+	`
+
+	err := r.DB.Raw(query, periodID).Scan(&salaries).Error
+
+	return salaries, err
+}

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -31,6 +32,23 @@ func NewEmployeeUseCase(
 }
 
 func (e *EmployeeUseCaseImpl) SubmitAttendance(userID int64, date time.Time, checkInTime time.Time, checkOutTime time.Time) error {
+	// Ensure check-in and check-out times are in same day
+	if checkInTime.Year() != checkOutTime.Year() ||
+		checkInTime.Month() != checkOutTime.Month() ||
+		checkInTime.Day() != checkOutTime.Day() {
+		return errors.New("check-in and check-out times must be on the same day")
+	}
+
+	// Ensure check-in time is not in the future
+	if checkOutTime.Before(checkInTime) {
+		return errors.New("check-out time cannot be before check-in time")
+	}
+
+	// Ensure in weekday (Monday to Friday)
+	if checkInTime.Weekday() == time.Saturday || checkInTime.Weekday() == time.Sunday {
+		return errors.New("attendance can only be submitted on weekdays (Monday to Friday)")
+	}
+
 	attendance := entity.EmployeeAttendance{
 		UserID:       userID,
 		Date:         date,
@@ -56,6 +74,31 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userID int64, date time.Time, che
 }
 
 func (e *EmployeeUseCaseImpl) SubmitOvertime(userID int64, date time.Time, durations int) error {
+	// When weekdays, It need to ensure that attendance is submitted
+	shouldCheckAttendance := date.Weekday() != time.Saturday && date.Weekday() != time.Sunday
+	if shouldCheckAttendance {
+		attendance, err := e.employeeRepository.GetAttendanceByUserAndDate(userID, date)
+		if err != nil {
+			log.Println(
+				"error when GetAttendanceByUserAndDate",
+				zap.String("method", "EmployeeUseCaseImpl.SubmitOvertime"),
+				zap.Int64("user_id", userID),
+				zap.Time("date", date),
+				zap.Error(err),
+			)
+			return err
+		}
+
+		if attendance.ID == 0 {
+			return errors.New("attendance must be submitted before submitting overtime")
+		}
+	}
+
+	// Only accept durations between 1 and 3 hours
+	if durations < 1 || durations > 3 {
+		return errors.New("overtime durations must be between 1 and 3 hours")
+	}
+
 	overtime := entity.EmployeeOvertime{
 		UserID:    userID,
 		Date:      date,

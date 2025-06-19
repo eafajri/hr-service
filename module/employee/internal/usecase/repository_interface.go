@@ -9,7 +9,6 @@ import (
 //go:generate mockery --name UserRepository --output ./mocks
 type UserRepository interface {
 	GetUserByID(userID int64) (entity.User, error)
-	GetUserSalaryByPeriodID(userID int64, periodID int64) (entity.UserSalary, error)
 }
 
 //go:generate mockery --name EmployeeRepository --output ./mocks
@@ -17,6 +16,12 @@ type EmployeeRepository interface {
 	UpsertAttendance(record entity.EmployeeAttendance) error
 	UpsertOvertime(record entity.EmployeeOvertime) error
 	UpsertReimbursement(record entity.EmployeeReimbursement) error
+
+	GetAttendanceByUserAndDate(userID int64, date time.Time) (entity.EmployeeAttendance, error)
+
+	GetAllAttendanceByPeriodID(periodID int64) ([]entity.EmployeeAttendance, error)
+	GetAllOvertimeByPeriodID(periodID int64) ([]entity.EmployeeOvertime, error)
+	GetAllReimbursementByPeriodID(periodID int64) ([]entity.EmployeeReimbursement, error)
 }
 
 //go:generate mockery --name PayrollPeriodRepository --output ./mocks
@@ -24,6 +29,7 @@ type PayrollRepository interface {
 	GetPeriodByEntityDate(date time.Time) (entity.PayrollPeriod, error)
 	GetPayslip(userID int64, periodID int64) (entity.PayrollPayslip, error)
 	GetPayslips(periodID int64) ([]entity.PayrollPayslip, error)
+	GetEmployeeBaseSalaryByPeriodID(periodID int64) ([]entity.EmployeeBaseSalary, error)
 
 	ClosePayrollPeriod(periodID int64) error
 	CreatePayslipsByPeriod(payslips []entity.PayrollPayslip) error

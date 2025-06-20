@@ -7,31 +7,72 @@ import (
 
 	"github.com/eafajri/hr-service.git/module/employee/internal/entity"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 //go:generate mockery --name ProfileUseCase --output ./mocks
 type EmployeeUseCase interface {
-	SubmitAttendance(userID int64, date time.Time, checkInTime, checkOutTime *time.Time) error
-	SubmitOvertime(userID int64, date time.Time, durations int) error
-	SubmitReimbursement(userID int64, date time.Time, amount float64, description string) error
+	SubmitAttendance(userContex entity.User, request entity.SubmitAttendanceRequest) error
+	SubmitOvertime(userContex entity.User, request entity.SubmitOvertimeRequest) error
+	SubmitReimbursement(userContex entity.User, request entity.SubmitReimbursementRequest) error
 }
 
 type EmployeeUseCaseImpl struct {
 	employeeRepository EmployeeRepository
-	userUseCase        UserUseCase
+	payrollRepository  PayrollRepository
 }
 
 func NewEmployeeUseCase(
 	employeeRepository EmployeeRepository,
-	userUseCase UserUseCase,
+	payrollRepository PayrollRepository,
 ) *EmployeeUseCaseImpl {
 	return &EmployeeUseCaseImpl{
 		employeeRepository: employeeRepository,
-		userUseCase:        userUseCase,
+		payrollRepository:  payrollRepository,
 	}
 }
 
-func (e *EmployeeUseCaseImpl) SubmitAttendance(userID int64, date time.Time, checkInTime time.Time, checkOutTime time.Time) error {
+func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request entity.SubmitAttendanceRequest) error {
+	attandanceDate, err := time.Parse("2006-01-02", request.Date)
+	if err != nil {
+		log.Println(
+			"error when parsing Date",
+			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
+			zap.Error(err),
+		)
+		return errors.New("invalid date format, must be YYYY-MM-DD")
+	}
+
+	if !e.isPeriodActive(attandanceDate) {
+		return errors.New("the attendance cannot be submitted because the payroll period is closed")
+	}
+
+	checkInTime, err := time.Parse(time.RFC3339, request.CheckInTime)
+	if err != nil {
+		log.Println(
+			"error when parsing CheckInTime",
+			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
+			zap.Error(err),
+		)
+		return errors.New("invalid check-in time format")
+	}
+
+	checkOutTime, err := time.Parse(time.RFC3339, request.CheckOutTime)
+	if err != nil {
+		log.Println(
+			"error when parsing CheckOutTime",
+			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
+			zap.Error(err),
+		)
+		return errors.New("invalid check-out time format")
+	}
+
 	// Ensure check-in and check-out times are in same day
 	if checkInTime.Year() != checkOutTime.Year() ||
 		checkInTime.Month() != checkOutTime.Month() ||
@@ -50,21 +91,21 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userID int64, date time.Time, che
 	}
 
 	attendance := entity.EmployeeAttendance{
-		UserID:       userID,
-		Date:         date,
+		UserID:       request.UserID,
+		Date:         attandanceDate,
 		CheckInTime:  checkInTime,
-		CheckOutTime: checkOutTime,
+		CheckOutTime: checkInTime,
+		CreatedBy:    userContex.Username,
+		UpdatedBy:    userContex.Username,
 	}
 
-	err := e.employeeRepository.UpsertAttendance(attendance)
+	err = e.employeeRepository.UpsertAttendance(attendance)
 	if err != nil {
 		log.Println(
 			"error when UpsertAttendance",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
-			zap.Int64("user_id", userID),
-			zap.Time("date", date),
-			zap.Time("check_in_time", checkInTime),
-			zap.Time("check_out_time", checkOutTime),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
 			zap.Error(err),
 		)
 		return err
@@ -73,17 +114,36 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userID int64, date time.Time, che
 	return nil
 }
 
-func (e *EmployeeUseCaseImpl) SubmitOvertime(userID int64, date time.Time, durations int) error {
+func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request entity.SubmitOvertimeRequest) error {
+	overtimeDate, err := time.Parse("2006-01-02", request.Date)
+	if err != nil {
+		log.Println(
+			"error when parsing Date",
+			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
+			zap.Error(err),
+		)
+		return errors.New("invalid date format, must be YYYY-MM-DD")
+	}
+
+	if !e.isPeriodActive(overtimeDate) {
+		return errors.New("the overtime cannot be submitted because the payroll period is closed")
+	}
+
 	// When weekdays, It need to ensure that attendance is submitted
-	shouldCheckAttendance := date.Weekday() != time.Saturday && date.Weekday() != time.Sunday
+	shouldCheckAttendance := overtimeDate.Weekday() != time.Saturday || overtimeDate.Weekday() != time.Sunday
 	if shouldCheckAttendance {
-		attendance, err := e.employeeRepository.GetAttendanceByUserAndDate(userID, date)
+		attendance, err := e.employeeRepository.GetAttendanceByUserAndDate(request.UserID, overtimeDate)
 		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return errors.New("attendance must be submitted before submitting overtime")
+			}
 			log.Println(
 				"error when GetAttendanceByUserAndDate",
 				zap.String("method", "EmployeeUseCaseImpl.SubmitOvertime"),
-				zap.Int64("user_id", userID),
-				zap.Time("date", date),
+				zap.Any("user_contex", userContex),
+				zap.Any("request", request),
 				zap.Error(err),
 			)
 			return err
@@ -95,24 +155,25 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userID int64, date time.Time, durat
 	}
 
 	// Only accept durations between 1 and 3 hours
-	if durations < 1 || durations > 3 {
+	if request.Durations < 1 || request.Durations > 3 {
 		return errors.New("overtime durations must be between 1 and 3 hours")
 	}
 
 	overtime := entity.EmployeeOvertime{
-		UserID:    userID,
-		Date:      date,
-		Durations: durations,
+		UserID:    request.UserID,
+		Date:      overtimeDate,
+		Durations: int(request.Durations),
+		CreatedBy: userContex.Username,
+		UpdatedBy: userContex.Username,
 	}
 
-	err := e.employeeRepository.UpsertOvertime(overtime)
+	err = e.employeeRepository.UpsertOvertime(overtime)
 	if err != nil {
 		log.Println(
 			"error when UpsertOvertime",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitOvertime"),
-			zap.Int64("user_id", userID),
-			zap.Time("date", date),
-			zap.Int("durations", durations),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
 			zap.Error(err),
 		)
 		return err
@@ -121,25 +182,66 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userID int64, date time.Time, durat
 	return nil
 }
 
-func (e *EmployeeUseCaseImpl) SubmitReimbursement(userID int64, date time.Time, amount float64, description string) error {
-	reimbursement := entity.EmployeeReimbursement{
-		UserID:      userID,
-		Date:        date,
-		Amount:      amount,
-		Description: description,
+func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContex entity.User, request entity.SubmitReimbursementRequest) error {
+	reimbursementDate, err := time.Parse("2006-01-02", request.Date)
+	if err != nil {
+		log.Println(
+			"error when parsing Date",
+			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
+			zap.Error(err),
+		)
+		return errors.New("invalid date format, must be YYYY-MM-DD")
 	}
 
-	err := e.employeeRepository.UpsertReimbursement(reimbursement)
+	if !e.isPeriodActive(reimbursementDate) {
+		return errors.New("the reimbursement cannot be submitted because the payroll period is closed")
+	}
+
+	reimbursement := entity.EmployeeReimbursement{
+
+		UserID:      request.UserID,
+		Date:        reimbursementDate,
+		Amount:      request.Amount,
+		Description: request.Description,
+		CreatedBy:   userContex.Username,
+		UpdatedBy:   userContex.Username,
+	}
+
+	err = e.employeeRepository.UpsertReimbursement(reimbursement)
 	if err != nil {
 		log.Println(
 			"error when UpsertReimbursement",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitReimbursement"),
-			zap.Int64("user_id", userID),
-			zap.Time("date", date),
+			zap.Any("user_contex", userContex),
+			zap.Any("request", request),
 			zap.Error(err),
 		)
 		return err
 	}
 
 	return nil
+}
+
+func (e *EmployeeUseCaseImpl) isPeriodActive(date time.Time) bool {
+	period, err := e.payrollRepository.GetPeriodByEntityDate(date)
+	if err != nil {
+		log.Println(
+			"error when GetPeriodByEntityDate",
+			zap.String("method", "EmployeeUseCaseImpl.isPeriodActive"),
+			zap.Error(err),
+		)
+		return false
+	}
+
+	if period.ID == 0 {
+		return false
+	}
+
+	if period.Status == "closed" {
+		return false
+	}
+
+	return true
 }

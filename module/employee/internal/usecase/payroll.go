@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"log"
 	"time"
 
@@ -31,19 +32,20 @@ func NewPayrollUseCase(
 }
 
 func (p *PayrollUseCaseImpl) GetPayslip(userID int64, periodID int64) (entity.PayrollPayslip, error) {
-	if periodID == 0 {
-		period, err := p.payrollRepository.GetPeriodByEntityDate(time.Now())
-		if err != nil {
-			log.Println(
-				"error when GetPeriodByEntityDate",
-				zap.String("method", "PayrollUseCaseImpl.GetPayslip"),
-				zap.Int64("user_id", userID),
-				zap.Error(err),
-			)
-			return entity.PayrollPayslip{}, err
-		}
+	payrollPeriod, err := p.payrollRepository.GetPeriodByID(periodID)
+	if err != nil {
+		log.Println(
+			"error when GetPeriodByID",
+			zap.String("method", "PayrollUseCaseImpl.GetPayslip"),
+			zap.Int64("user_id", userID),
+			zap.Int64("period_id", periodID),
+			zap.Error(err),
+		)
+		return entity.PayrollPayslip{}, err
+	}
 
-		periodID = period.ID
+	if payrollPeriod.Status == "open" {
+		return entity.PayrollPayslip{}, errors.New("the payroll period is still open")
 	}
 
 	payslip, err := p.payrollRepository.GetPayslip(userID, periodID)
@@ -109,8 +111,18 @@ func (p *PayrollUseCaseImpl) ClosePayrollPeriod(periodID int64) error {
 }
 
 func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64) error {
-	// Get employee base salary by period ID
-	employeeBaseSalaries, err := p.payrollRepository.GetEmployeeBaseSalaryByPeriodID(periodID)
+	periodDetails, err := p.payrollRepository.GetPeriodByID(periodID)
+	if err != nil {
+		log.Println(
+			"error when GetPeriodByID",
+			zap.String("method", "PayrollUseCaseImpl.ClosePayrollPeriod"),
+			zap.Int64("period_id", periodID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	employeeBaseSalaries, err := p.employeeRepository.GetEmployeeBaseSalaryByPeriodStart(periodDetails.PeriodStart)
 	if err != nil {
 		log.Println(
 			"error when GetEmployeeBaseSalaryByPeriodID",
@@ -121,7 +133,7 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64) error {
 		return err
 	}
 
-	attendanceRecordsMap, err := p.getEmployeeBaseSalaryByPeriodID(periodID)
+	attendanceRecordsMap, err := p.getEmployeeBaseSalaryByPeriodID(periodDetails)
 	if err != nil {
 		log.Println(
 			"error when GetAllAttendanceByPeriodID",
@@ -132,7 +144,7 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64) error {
 		return err
 	}
 
-	overtimeRecordsMap, err := p.getEmployeeOvertimeByPeriodID(periodID)
+	overtimeRecordsMap, err := p.getEmployeeOvertimeByPeriodID(periodDetails)
 	if err != nil {
 		log.Println(
 			"error when GetAllOvertimeByPeriodID",
@@ -143,7 +155,7 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64) error {
 		return err
 	}
 
-	reimbursementRecordsMap, err := p.getEmployeeReimbursementByPeriodID(periodID)
+	reimbursementRecordsMap, err := p.getEmployeeReimbursementByPeriodID(periodDetails)
 	if err != nil {
 		log.Println(
 			"error when GetAllReimbursementByPeriodID",
@@ -208,8 +220,8 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64) error {
 	return nil
 }
 
-func (p *PayrollUseCaseImpl) getEmployeeBaseSalaryByPeriodID(periodID int64) (map[int64][]entity.EmployeeAttendance, error) {
-	attendanceRecords, err := p.employeeRepository.GetAllAttendanceByPeriodID(periodID)
+func (p *PayrollUseCaseImpl) getEmployeeBaseSalaryByPeriodID(periodDetails entity.PayrollPeriod) (map[int64][]entity.EmployeeAttendance, error) {
+	attendanceRecords, err := p.employeeRepository.GetAllAttendanceByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd)
 	if err != nil {
 		return map[int64][]entity.EmployeeAttendance{}, err
 	}
@@ -225,16 +237,10 @@ func (p *PayrollUseCaseImpl) getEmployeeBaseSalaryByPeriodID(periodID int64) (ma
 	return attendanceRecordsMap, nil
 }
 
-func (p *PayrollUseCaseImpl) getEmployeeOvertimeByPeriodID(periodID int64) (map[int64][]entity.EmployeeOvertime, error) {
+func (p *PayrollUseCaseImpl) getEmployeeOvertimeByPeriodID(periodDetails entity.PayrollPeriod) (map[int64][]entity.EmployeeOvertime, error) {
 	// Get employee overtime by period ID
-	overtimeRecords, err := p.employeeRepository.GetAllOvertimeByPeriodID(periodID)
+	overtimeRecords, err := p.employeeRepository.GetAllOvertimeByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd)
 	if err != nil {
-		log.Println(
-			"error when GetAllOvertimeByPeriodID",
-			zap.String("method", "PayrollUseCaseImpl.ClosePayrollPeriod"),
-			zap.Int64("period_id", periodID),
-			zap.Error(err),
-		)
 		return map[int64][]entity.EmployeeOvertime{}, err
 	}
 
@@ -249,15 +255,9 @@ func (p *PayrollUseCaseImpl) getEmployeeOvertimeByPeriodID(periodID int64) (map[
 	return overtimeRecordsMap, nil
 }
 
-func (p *PayrollUseCaseImpl) getEmployeeReimbursementByPeriodID(periodID int64) (map[int64][]entity.EmployeeReimbursement, error) {
-	reimbursementRecords, err := p.employeeRepository.GetAllReimbursementByPeriodID(periodID)
+func (p *PayrollUseCaseImpl) getEmployeeReimbursementByPeriodID(periodDetails entity.PayrollPeriod) (map[int64][]entity.EmployeeReimbursement, error) {
+	reimbursementRecords, err := p.employeeRepository.GetAllReimbursementByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd)
 	if err != nil {
-		log.Println(
-			"error when GetAllReimbursementByPeriodID",
-			zap.String("method", "PayrollUseCaseImpl.ClosePayrollPeriod"),
-			zap.Int64("period_id", periodID),
-			zap.Error(err),
-		)
 		return map[int64][]entity.EmployeeReimbursement{}, err
 	}
 

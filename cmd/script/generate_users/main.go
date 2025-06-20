@@ -4,54 +4,48 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
-	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
-	file, err := os.Create("./cmd/script/users_dummy.csv")
+	// Open file for writing
+	file, err := os.Create("users.csv")
 	if err != nil {
-		log.Fatalf("Cannot create file: %v", err)
+		log.Fatalf("failed to create file: %v", err)
 	}
 	defer file.Close()
 
+	// Initialize CSV writer
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	err = writer.Write([]string{"id", "username", "full_name", "password_hash", "salary", "role"})
+	// Write CSV header
+	err = writer.Write([]string{"email", "password", "role"})
 	if err != nil {
-		log.Fatalf("Cannot write header: %v", err)
+		log.Fatalf("failed to write header: %v", err)
 	}
 
+	// Write user records
 	for i := 1; i <= 100; i++ {
-		fullName := fmt.Sprintf("User %03d", i)
-		username := fmt.Sprintf("user%03d", i)
-		plainPassword := fmt.Sprintf("%d%s", i, fullName)
-		randomFactor := rand.Intn(51)
-		salary := float64(5000+randomFactor*100) * 1000
-
-		hashed, err := bcrypt.GenerateFromPassword([]byte(plainPassword), bcrypt.DefaultCost)
+		email := fmt.Sprintf("user%d@example.com", i)
+		password := email
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
-			log.Fatalf("Failed to hash password for user %d: %v", i, err)
+			log.Fatalf("failed to hash password: %v", err)
 		}
 
-		record := []string{
-			strconv.Itoa(i),
-			username,
-			fullName,
-			string(hashed),
-			fmt.Sprintf("%.2f", salary),
-			"employee",
+		role := "employee"
+		if i%2 == 0 {
+			role = "admin"
 		}
 
-		err = writer.Write(record)
+		err = writer.Write([]string{email, string(hashedPassword), role})
 		if err != nil {
-			log.Fatalf("Failed to write record for user %d: %v", i, err)
+			log.Fatalf("failed to write record: %v", err)
 		}
 	}
 
-	fmt.Println("CSV file 'users_dummy.csv' created successfully.")
+	fmt.Println("✅ users.csv has been generated successfully.")
 }

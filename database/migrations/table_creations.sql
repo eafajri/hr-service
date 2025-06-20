@@ -6,7 +6,6 @@ CREATE TYPE payroll_periods_status AS ENUM ('open', 'closed');
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(255) NOT NULL,
-    full_name VARCHAR(255) NOT NULL,
     password TEXT NOT NULL,
     role user_role NOT NULL
 );
@@ -57,6 +56,7 @@ CREATE TABLE employee_reimbursements (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_by VARCHAR(255) NOT NULL,
     description TEXT
+    UNIQUE (user_id, date)
 );
 
 -- Payroll periods table

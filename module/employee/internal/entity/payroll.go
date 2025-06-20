@@ -15,10 +15,10 @@ type PayrollPeriod struct {
 	PeriodEnd   time.Time           `gorm:"type:date;not null" json:"period_end"`
 	WorkingDays int                 `gorm:"not null" json:"working_days"`
 	Status      PayrollPeriodStatus `gorm:"type:payroll_periods_status;default:'open'" json:"status"`
-	UpdatedAt   time.Time           `gorm:"autoUpdateTime" json:"updated_at"`
-	UpdatedBy   int64               `gorm:"not null;index" json:"updated_by"`
-	CreatedAt   time.Time           `gorm:"autoCreateTime" json:"created_at"`
-	CreatedBy   int64               `gorm:"not null;index" json:"created_by"`
+	UpdatedAt   time.Time           `gorm:"updated_at" json:"updated_at"`
+	UpdatedBy   string              `gorm:"updated_by" json:"updated_by"`
+	CreatedAt   time.Time           `gorm:"created_at" json:"created_at"`
+	CreatedBy   string              `gorm:"created_by" json:"created_by"`
 }
 
 func (PayrollPeriod) TableName() string {
@@ -37,8 +37,8 @@ type PayrollPayslip struct {
 	OvertimePay        float64   `gorm:"type:numeric(10,2);not null" json:"overtime_pay"`
 	ReimbursementTotal float64   `gorm:"type:numeric(10,2);not null" json:"reimbursement_total"`
 	TotalTakeHome      float64   `gorm:"type:numeric(10,2);not null" json:"total_take_home"`
-	CreatedAt          time.Time `gorm:"autoCreateTime" json:"created_at"`
-	CreatedBy          int64     `gorm:"not null;index" json:"created_by"`
+	CreatedAt          time.Time `gorm:"created_at" json:"created_at"`
+	CreatedBy          string    `gorm:"created_by" json:"created_by"`
 }
 
 func (PayrollPayslip) TableName() string {

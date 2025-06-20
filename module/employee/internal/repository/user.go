@@ -22,18 +22,9 @@ func (r *UserRepositoryImpl) GetUserByID(userID int64) (entity.User, error) {
 	return user, err
 }
 
-func (r *UserRepositoryImpl) GetUserSalaryByPeriodID(userID int64, periodID int64) (float64, error) {
-	query := `
-		SELECT us.amount
-		FROM users_salaries us
-		JOIN payroll_periods pp ON pp.id = $2
-		WHERE us.user_id = $1
-		AND us.effective_from <= pp.period_start
-		ORDER BY us.effective_from DESC
-		LIMIT 1;
-	`
+func (r *UserRepositoryImpl) GetUserByUsername(username string) (entity.User, error) {
+	var user entity.User
+	err := r.DB.Where("username = ?", username).First(&user).Error
 
-	var amount float64
-	err := r.DB.Raw(query, userID, periodID).Scan(&amount).Error
-	return amount, err
+	return user, err
 }

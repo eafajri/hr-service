@@ -17,6 +17,15 @@ func NewPayrollRepository(db *gorm.DB) *PayrollRepositoryImpl {
 	}
 }
 
+func (r *PayrollRepositoryImpl) GetPeriodByID(periodID int64) (entity.PayrollPeriod, error) {
+	var period entity.PayrollPeriod
+	err := r.DB.First(&period, periodID).Error
+	if err != nil {
+		return entity.PayrollPeriod{}, err
+	}
+	return period, nil
+}
+
 func (r *PayrollRepositoryImpl) GetPeriodByEntityDate(date time.Time) (entity.PayrollPeriod, error) {
 	var period entity.PayrollPeriod
 	err := r.DB.Where("period_start <= ? AND period_end >= ?", date, date).First(&period).Error
@@ -25,7 +34,7 @@ func (r *PayrollRepositoryImpl) GetPeriodByEntityDate(date time.Time) (entity.Pa
 
 func (r *PayrollRepositoryImpl) GetPayslip(userID int64, periodID int64) (entity.PayrollPayslip, error) {
 	var payslip entity.PayrollPayslip
-	err := r.DB.Where("user_id = ? AND period_id = ?", userID, periodID).First(&payslip).Error
+	err := r.DB.Where("user_id = ? AND payroll_period_id = ?", userID, periodID).First(&payslip).Error
 	return payslip, err
 }
 
@@ -41,21 +50,4 @@ func (r *PayrollRepositoryImpl) ClosePayrollPeriod(periodID int64) error {
 
 func (r *PayrollRepositoryImpl) CreatePayslipsByPeriod(payslips []entity.PayrollPayslip) error {
 	return r.DB.CreateInBatches(payslips, 100).Error
-}
-
-func (r *PayrollRepositoryImpl) GetEmployeeBaseSalaryByPeriodID(periodID int64) ([]entity.EmployeeBaseSalary, error) {
-	var salaries []entity.EmployeeBaseSalary
-
-	query := `
-		SELECT DISTINCT ON (us.user_id) 
-			us.user_id, us.amount
-		FROM users_salaries us
-		JOIN payroll_periods pp ON pp.id = ?
-		WHERE us.effective_from <= pp.period_start
-		ORDER BY us.user_id, us.effective_from DESC;
-	`
-
-	err := r.DB.Raw(query, periodID).Scan(&salaries).Error
-
-	return salaries, err
 }

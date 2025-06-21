@@ -12,25 +12,28 @@ import (
 
 //go:generate mockery --name ProfileUseCase --output ./mocks
 type EmployeeUseCase interface {
-	SubmitAttendance(userContex entity.User, request entity.SubmitAttendanceRequest) error
-	SubmitOvertime(userContex entity.User, request entity.SubmitOvertimeRequest) error
-	SubmitReimbursement(userContex entity.User, request entity.SubmitReimbursementRequest) error
+	SubmitAttendance(userContext entity.UserContext, request entity.SubmitAttendanceRequest) error
+	SubmitOvertime(userContext entity.UserContext, request entity.SubmitOvertimeRequest) error
+	SubmitReimbursement(userContext entity.UserContext, request entity.SubmitReimbursementRequest) error
 
-	GetPayslipBreakdown(userContext entity.User, periodID int64) (any, error)
+	GetPayslipBreakdown(userContext entity.UserContext, periodID int64) (any, error)
 }
 
 type EmployeeUseCaseImpl struct {
 	employeeRepository EmployeeRepository
 	payrollRepository  PayrollRepository
+	auditLogRepository AuditLogRepository
 }
 
 func NewEmployeeUseCase(
 	employeeRepository EmployeeRepository,
 	payrollRepository PayrollRepository,
+	auditLogRepository AuditLogRepository,
 ) *EmployeeUseCaseImpl {
 	return &EmployeeUseCaseImpl{
 		employeeRepository: employeeRepository,
 		payrollRepository:  payrollRepository,
+		auditLogRepository: auditLogRepository,
 	}
 }
 
@@ -39,13 +42,17 @@ No rules for late or early check-ins or check-outs; check-in at any time that da
 Submissions on the same day should count as one.
 Users cannot submit on weekends.
 */
-func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request entity.SubmitAttendanceRequest) error {
+func (e *EmployeeUseCaseImpl) SubmitAttendance(userContext entity.UserContext, request entity.SubmitAttendanceRequest) error {
+	if userContext.UserID != request.UserID {
+		return errors.New("user context does not match request user ID")
+	}
+
 	attandanceDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
 		log.Println(
 			"error when parsing Date",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
@@ -61,7 +68,7 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request e
 		log.Println(
 			"error when parsing CheckInTime",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
@@ -73,7 +80,7 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request e
 		log.Println(
 			"error when parsing CheckOutTime",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
@@ -99,8 +106,8 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request e
 		Date:         attandanceDate,
 		CheckInTime:  checkInTime,
 		CheckOutTime: checkOutTime,
-		CreatedBy:    userContex.Username,
-		UpdatedBy:    userContex.Username,
+		CreatedBy:    userContext.Username,
+		UpdatedBy:    userContext.Username,
 	}
 
 	err = e.employeeRepository.UpsertAttendance(attendance)
@@ -108,12 +115,21 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request e
 		log.Println(
 			"error when UpsertAttendance",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
 		return err
 	}
+
+	go e.auditLogRepository.Create(entity.AuditLog{
+		RequestID: userContext.RequestID,
+		IPAddress: userContext.IPAddress,
+		Action:    "submit",
+		Target:    "attendance",
+		TableName: "employee_attendances",
+		CreatedBy: userContext.Username,
+	}, attendance)
 
 	return nil
 }
@@ -124,13 +140,13 @@ They can submit the number of hours taken for that overtime.
 Overtime cannot be more than 3 hours per day.
 Overtime can be taken any day.
 */
-func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request entity.SubmitOvertimeRequest) error {
+func (e *EmployeeUseCaseImpl) SubmitOvertime(userContext entity.UserContext, request entity.SubmitOvertimeRequest) error {
 	overtimeDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
 		log.Println(
 			"error when parsing Date",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
@@ -152,7 +168,7 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request ent
 			log.Println(
 				"error when GetAttendanceByUserAndDate",
 				zap.String("method", "EmployeeUseCaseImpl.SubmitOvertime"),
-				zap.Any("user_contex", userContex),
+				zap.Any("user_contex", userContext),
 				zap.Any("request", request),
 				zap.Error(err),
 			)
@@ -173,8 +189,8 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request ent
 		UserID:    request.UserID,
 		Date:      overtimeDate,
 		Durations: int(request.Durations),
-		CreatedBy: userContex.Username,
-		UpdatedBy: userContex.Username,
+		CreatedBy: userContext.Username,
+		UpdatedBy: userContext.Username,
 	}
 
 	err = e.employeeRepository.UpsertOvertime(overtime)
@@ -182,12 +198,21 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request ent
 		log.Println(
 			"error when UpsertOvertime",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitOvertime"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
 		return err
 	}
+
+	go e.auditLogRepository.Create(entity.AuditLog{
+		RequestID: userContext.RequestID,
+		IPAddress: userContext.IPAddress,
+		Action:    "submit",
+		Target:    "overtime",
+		TableName: "employee_overtimes",
+		CreatedBy: userContext.Username,
+	}, overtime)
 
 	return nil
 }
@@ -196,13 +221,13 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request ent
 Employees can attach the amount of money that needs to be reimbursed.
 Employees can attach a description to that reimbursement.
 */
-func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContex entity.User, request entity.SubmitReimbursementRequest) error {
+func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContext entity.UserContext, request entity.SubmitReimbursementRequest) error {
 	reimbursementDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
 		log.Println(
 			"error when parsing Date",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitAttendance"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
@@ -219,8 +244,8 @@ func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContex entity.User, reques
 		Date:        reimbursementDate,
 		Amount:      request.Amount,
 		Description: request.Description,
-		CreatedBy:   userContex.Username,
-		UpdatedBy:   userContex.Username,
+		CreatedBy:   userContext.Username,
+		UpdatedBy:   userContext.Username,
 	}
 
 	err = e.employeeRepository.UpsertReimbursement(reimbursement)
@@ -228,17 +253,26 @@ func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContex entity.User, reques
 		log.Println(
 			"error when UpsertReimbursement",
 			zap.String("method", "EmployeeUseCaseImpl.SubmitReimbursement"),
-			zap.Any("user_contex", userContex),
+			zap.Any("user_contex", userContext),
 			zap.Any("request", request),
 			zap.Error(err),
 		)
 		return err
 	}
 
+	go e.auditLogRepository.Create(entity.AuditLog{
+		RequestID: userContext.RequestID,
+		IPAddress: userContext.IPAddress,
+		Action:    "submit",
+		Target:    "reimbursement",
+		TableName: "employee_reimbursements",
+		CreatedBy: userContext.Username,
+	}, reimbursement)
+
 	return nil
 }
 
-func (e *EmployeeUseCaseImpl) GetPayslipBreakdown(userContext entity.User, periodID int64) (any, error) {
+func (e *EmployeeUseCaseImpl) GetPayslipBreakdown(userContext entity.UserContext, periodID int64) (any, error) {
 	periodDetails, err := e.payrollRepository.GetPeriodByID(periodID)
 	if err != nil {
 		log.Println(
@@ -249,12 +283,12 @@ func (e *EmployeeUseCaseImpl) GetPayslipBreakdown(userContext entity.User, perio
 		return nil, err
 	}
 
-	baseSalaries, err := e.employeeRepository.GetEmployeeBaseSalaryByPeriodStart(periodDetails.PeriodStart, &userContext.ID)
+	baseSalaries, err := e.employeeRepository.GetEmployeeBaseSalaryByPeriodStart(periodDetails.PeriodStart, &userContext.UserID)
 	if err != nil {
 		log.Println(
 			"error when GetBaseSalaryByUserID",
 			zap.String("method", "EmployeeUseCaseImpl.GetPayslipSummary"),
-			zap.Int64("user_id", userContext.ID),
+			zap.Int64("user_id", userContext.UserID),
 			zap.Error(err),
 		)
 		return nil, err
@@ -265,23 +299,23 @@ func (e *EmployeeUseCaseImpl) GetPayslipBreakdown(userContext entity.User, perio
 	}
 	baseSalaryDetail := baseSalaries[0]
 
-	attendanceRecords, err := e.employeeRepository.GetAllAttendanceByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.ID)
+	attendanceRecords, err := e.employeeRepository.GetAllAttendanceByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	overtimeRecords, err := e.employeeRepository.GetAllOvertimeByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.ID)
+	overtimeRecords, err := e.employeeRepository.GetAllOvertimeByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	reimbursementRecords, err := e.employeeRepository.GetAllReimbursementByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.ID)
+	reimbursementRecords, err := e.employeeRepository.GetAllReimbursementByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.UserID)
 	if err != nil {
 		return map[int64][]entity.EmployeeReimbursement{}, err
 	}
 
 	payslip := entity.PayrollPayslip{}
-	payslip.GeneratePayslip(periodDetails, baseSalaryDetail, attendanceRecords, overtimeRecords, reimbursementRecords)
+	payslip.GeneratePayslip(periodDetails, baseSalaryDetail, attendanceRecords, overtimeRecords, reimbursementRecords, userContext.Username)
 
 	return map[string]interface{}{
 		"summary":        payslip,

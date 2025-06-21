@@ -13,21 +13,24 @@ import (
 type PayrollUseCase interface {
 	GetPayslip(userID int64, periodID int64) (entity.PayrollPayslip, error)
 	GetPayslips(periodID int64) ([]entity.PayrollPayslip, error)
-	ClosePayrollPeriod(userContex entity.User, periodID int64) error
+	ClosePayrollPeriod(userContex entity.UserContext, periodID int64) error
 }
 
 type PayrollUseCaseImpl struct {
 	payrollRepository  PayrollRepository
 	employeeRepository EmployeeRepository
+	auditLogRepository AuditLogRepository
 }
 
 func NewPayrollUseCase(
 	payrollRepository PayrollRepository,
 	employeeRepository EmployeeRepository,
+	auditLogRepository AuditLogRepository,
 ) *PayrollUseCaseImpl {
 	return &PayrollUseCaseImpl{
 		payrollRepository:  payrollRepository,
 		employeeRepository: employeeRepository,
+		auditLogRepository: auditLogRepository,
 	}
 }
 
@@ -106,7 +109,7 @@ func (p *PayrollUseCaseImpl) GetPayslips(periodID int64) ([]entity.PayrollPaysli
 Once payroll is run, attendance, overtime, and reimbursement records from that period cannot affect the payslip.
 Payroll for each attendance period can only be run once.
 */
-func (p *PayrollUseCaseImpl) ClosePayrollPeriod(userContex entity.User, periodID int64) error {
+func (p *PayrollUseCaseImpl) ClosePayrollPeriod(userContext entity.UserContext, periodID int64) error {
 	payrollPeriod, err := p.payrollRepository.GetPeriodByID(periodID)
 	if err != nil {
 		log.Println(
@@ -133,12 +136,21 @@ func (p *PayrollUseCaseImpl) ClosePayrollPeriod(userContex entity.User, periodID
 		return err
 	}
 
-	go p.createPayslipsByPeriodID(periodID, userContex.Username)
+	go p.auditLogRepository.Create(entity.AuditLog{
+		RequestID: userContext.RequestID,
+		IPAddress: userContext.IPAddress,
+		Action:    "update",
+		Target:    "reimbursement",
+		TableName: "payroll_period",
+		CreatedBy: userContext.Username,
+	}, payrollPeriod)
+
+	go p.createPayslipsByPeriodID(userContext, periodID)
 
 	return err
 }
 
-func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64, createdBy string) error {
+func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(userContext entity.UserContext, periodID int64) error {
 	periodDetails, err := p.payrollRepository.GetPeriodByID(periodID)
 	if err != nil {
 		log.Println(
@@ -197,7 +209,7 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64, createdBy 
 	payslips := make([]entity.PayrollPayslip, 0, len(employeeBaseSalaries))
 	for _, employeeBaseSalary := range employeeBaseSalaries {
 		payslip := entity.PayrollPayslip{}
-		payslip.GeneratePayslip(periodDetails, employeeBaseSalary, attendanceRecordsMap[employeeBaseSalary.UserID], overtimeRecordsMap[employeeBaseSalary.UserID], reimbursementRecordsMap[employeeBaseSalary.UserID])
+		payslip.GeneratePayslip(periodDetails, employeeBaseSalary, attendanceRecordsMap[employeeBaseSalary.UserID], overtimeRecordsMap[employeeBaseSalary.UserID], reimbursementRecordsMap[employeeBaseSalary.UserID], userContext.Username)
 
 		payslips = append(payslips, payslip)
 	}
@@ -212,6 +224,15 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(periodID int64, createdBy 
 		)
 		return err
 	}
+
+	go p.auditLogRepository.Create(entity.AuditLog{
+		RequestID: userContext.RequestID,
+		IPAddress: userContext.IPAddress,
+		Action:    "create",
+		Target:    "payslips",
+		TableName: "payroll_peyslips",
+		CreatedBy: userContext.Username,
+	}, payslips)
 
 	return nil
 }

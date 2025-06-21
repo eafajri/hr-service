@@ -25,12 +25,13 @@ func StartRest(echoInstance *echo.Echo) {
 		userRepository     = repository.NewUserRepository(&moduleDependencies.Database)
 		employeeRepository = repository.NewEmployeeRepository(&moduleDependencies.Database)
 		payrollRepository  = repository.NewPayrollRepository(&moduleDependencies.Database)
+		auditLogRepository = repository.NewAuditLogRepository(&moduleDependencies.Database)
 	)
 
 	restHandler := &Rest{
 		userUc:     usecase.NewUserUseCase(userRepository),
-		employeeUc: usecase.NewEmployeeUseCase(employeeRepository, payrollRepository),
-		payrollUc:  usecase.NewPayrollUseCase(payrollRepository, employeeRepository),
+		employeeUc: usecase.NewEmployeeUseCase(employeeRepository, payrollRepository, auditLogRepository),
+		payrollUc:  usecase.NewPayrollUseCase(payrollRepository, employeeRepository, auditLogRepository),
 	}
 
 	publicApi := echoInstance.Group("/public")

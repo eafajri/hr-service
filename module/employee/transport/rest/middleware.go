@@ -7,6 +7,7 @@ import (
 
 	"github.com/eafajri/hr-service.git/module/employee/internal/entity"
 	"github.com/eafajri/hr-service.git/module/employee/internal/usecase"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -40,7 +41,20 @@ func BasicAuthMiddleware(userUc usecase.UserUseCase) echo.MiddlewareFunc {
 				return echo.NewHTTPError(http.StatusUnauthorized, "Invalid username or password")
 			}
 
-			c.Set("user", user)
+			requestID := c.Request().Header.Get("X-Request-ID")
+			if requestID == "" {
+				requestID = uuid.New().String()
+			}
+
+			userContext := entity.UserContext{
+				UserID:    user.ID,
+				Username:  user.Username,
+				Role:      user.Role,
+				IPAddress: c.RealIP(),
+				RequestID: requestID,
+			}
+
+			c.Set("user_context", userContext)
 
 			return next(c)
 		}
@@ -50,7 +64,7 @@ func BasicAuthMiddleware(userUc usecase.UserUseCase) echo.MiddlewareFunc {
 func AdminPrevilageMiddleware(userUc usecase.UserUseCase) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			user, ok := c.Get("user").(entity.User)
+			user, ok := c.Get("user_context").(entity.UserContext)
 			if !ok {
 				return echo.NewHTTPError(http.StatusUnauthorized, "User ID not found in context")
 			}

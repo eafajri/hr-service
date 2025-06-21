@@ -13,14 +13,32 @@ import (
 
 func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 	tests := []struct {
-		name     string
-		request  entity.SubmitAttendanceRequest
-		mockFunc func(
+		name        string
+		userContext entity.UserContext
+		request     entity.SubmitAttendanceRequest
+		mockFunc    func(
 			employeeRepository *mocks.EmployeeRepository,
 			payrollRepository *mocks.PayrollRepository,
+			auditLogRepository *mocks.AuditLogRepository,
 		)
 		wantErr error
 	}{
+		{
+			name: "error - user context does not match request user ID",
+			userContext: entity.UserContext{
+				UserID: 112,
+			},
+			request: entity.SubmitAttendanceRequest{
+				UserID: 332,
+			},
+			mockFunc: func(
+				employeeRepository *mocks.EmployeeRepository,
+				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
+			) {
+			},
+			wantErr: errors.New("user context does not match request user ID"),
+		},
 		{
 			name: "error - invalid date format",
 			request: entity.SubmitAttendanceRequest{
@@ -29,6 +47,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 			},
 			wantErr: errors.New("invalid date format, must be YYYY-MM-DD"),
@@ -41,6 +60,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "closed"}, nil)
@@ -56,6 +76,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "open"}, nil)
@@ -72,6 +93,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "open"}, nil)
@@ -88,6 +110,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "open"}, nil)
@@ -104,6 +127,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "open"}, nil)
@@ -120,6 +144,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "open"}, nil)
@@ -136,6 +161,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "open"}, nil)
@@ -154,6 +180,7 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
 				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByEntityDate", mock.Anything).
 					Return(entity.PayrollPeriod{ID: 1, Status: "open"}, nil)
@@ -168,11 +195,12 @@ func Test_EmployeeUseCase_SubmitAttendance(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			employeeRepository := mocks.NewEmployeeRepository(t)
 			payrollRepository := mocks.NewPayrollRepository(t)
+			auditLogRepository := mocks.NewAuditLogRepository(t)
 
-			tt.mockFunc(employeeRepository, payrollRepository)
+			tt.mockFunc(employeeRepository, payrollRepository, auditLogRepository)
 
-			usecase := usecase.NewEmployeeUseCase(employeeRepository, payrollRepository)
-			err := usecase.SubmitAttendance(entity.User{}, tt.request)
+			usecase := usecase.NewEmployeeUseCase(employeeRepository, payrollRepository, auditLogRepository)
+			err := usecase.SubmitAttendance(entity.UserContext{}, tt.request)
 			if tt.wantErr != nil {
 				assert.Equal(t, tt.wantErr.Error(), err.Error())
 			} else {

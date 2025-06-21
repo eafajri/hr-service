@@ -37,3 +37,8 @@ type PayrollRepository interface {
 	ClosePayrollPeriod(periodID int64) error
 	CreatePayslipsByPeriod(payslips []entity.PayrollPayslip) error
 }
+
+//go:generate mockery --name AuditLogRepository --output ./mocks
+type AuditLogRepository interface {
+	Create(log entity.AuditLog, payload any) error
+}

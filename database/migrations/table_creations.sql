@@ -90,3 +90,16 @@ CREATE TABLE payroll_payslips (
     created_by VARCHAR(255) NOT NULL,
     UNIQUE(user_id, payroll_period_id)
 );
+
+-- Audit logs table
+CREATE TABLE audit_logs (
+    id SERIAL PRIMARY KEY,
+    request_id UUID,
+    ip_address VARCHAR(64),
+    table_name VARCHAR(255) NOT NULL,
+    action VARCHAR(255) NOT NULL,
+    target VARCHAR(255) NOT NULL,
+    payload JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) NOT NULL
+);

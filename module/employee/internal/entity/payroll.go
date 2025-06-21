@@ -50,7 +50,7 @@ func (PayrollPayslip) TableName() string {
 	return "payroll_payslips"
 }
 
-func (p *PayrollPayslip) GeneratePayslip(periodDetail PayrollPeriod, baseSalaryDetail EmployeeBaseSalary, attendanceRecords []EmployeeAttendance, overtimeRecords []EmployeeOvertime, reimbursementRecords []EmployeeReimbursement) {
+func (p *PayrollPayslip) GeneratePayslip(periodDetail PayrollPeriod, baseSalaryDetail EmployeeBaseSalary, attendanceRecords []EmployeeAttendance, overtimeRecords []EmployeeOvertime, reimbursementRecords []EmployeeReimbursement, createdBy string) {
 	p.UserID = baseSalaryDetail.UserID
 	p.PayrollPeriodID = periodDetail.ID
 	p.BaseSalary = baseSalaryDetail.BaseSalary
@@ -75,4 +75,5 @@ func (p *PayrollPayslip) GeneratePayslip(periodDetail PayrollPeriod, baseSalaryD
 	}
 
 	p.TotalTakeHome = p.AttendancePay + p.OvertimePay + p.ReimbursementTotal
+	p.CreatedBy = createdBy
 }

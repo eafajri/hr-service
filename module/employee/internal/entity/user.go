@@ -31,3 +31,11 @@ type UserSalary struct {
 func (EmployeeAttendance) UserSalary() string {
 	return "user_salaries"
 }
+
+type UserContext struct {
+	RequestID string   `json:"request_id"`
+	IPAddress string   `json:"ip_address"`
+	UserID    int64    `json:"user_id"`
+	Username  string   `json:"username"`
+	Role      UserRole `json:"role"`
+}

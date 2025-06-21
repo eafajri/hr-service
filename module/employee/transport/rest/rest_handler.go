@@ -9,7 +9,7 @@ import (
 )
 
 func (r *Rest) SubmitAttendance(c echo.Context) error {
-	userDetail, ok := c.Get("user").(entity.User)
+	userDetail, ok := c.Get("user_context").(entity.UserContext)
 	if !ok {
 		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
 	}
@@ -28,7 +28,7 @@ func (r *Rest) SubmitAttendance(c echo.Context) error {
 }
 
 func (r *Rest) SubmitOvertime(c echo.Context) error {
-	userDetail, ok := c.Get("user").(entity.User)
+	userDetail, ok := c.Get("user_context").(entity.UserContext)
 	if !ok {
 		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
 	}
@@ -47,7 +47,7 @@ func (r *Rest) SubmitOvertime(c echo.Context) error {
 }
 
 func (r *Rest) SubmitReimbursement(c echo.Context) error {
-	userDetail, ok := c.Get("user").(entity.User)
+	userDetail, ok := c.Get("user_context").(entity.UserContext)
 	if !ok {
 		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
 	}
@@ -100,7 +100,7 @@ func (r *Rest) GetPayslips(c echo.Context) error {
 }
 
 func (r *Rest) GeneratePayroll(c echo.Context) error {
-	userDetail, ok := c.Get("user").(entity.User)
+	userDetail, ok := c.Get("user_context").(entity.UserContext)
 	if !ok {
 		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
 	}
@@ -120,7 +120,7 @@ func (r *Rest) GeneratePayroll(c echo.Context) error {
 }
 
 func (r *Rest) GetPayslipBreakdown(c echo.Context) error {
-	userDetail, ok := c.Get("user").(entity.User)
+	userDetail, ok := c.Get("user_context").(entity.UserContext)
 	if !ok {
 		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
 	}

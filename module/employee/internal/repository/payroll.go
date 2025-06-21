@@ -40,7 +40,7 @@ func (r *PayrollRepositoryImpl) GetPayslip(userID int64, periodID int64) (entity
 
 func (r *PayrollRepositoryImpl) GetPayslips(periodID int64) ([]entity.PayrollPayslip, error) {
 	var payslips []entity.PayrollPayslip
-	err := r.DB.Where("period_id = ?", periodID).Find(&payslips).Error
+	err := r.DB.Where("payroll_period_id = ?", periodID).Find(&payslips).Error
 	return payslips, err
 }
 

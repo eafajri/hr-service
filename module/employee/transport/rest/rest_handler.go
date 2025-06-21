@@ -66,30 +66,75 @@ func (r *Rest) SubmitReimbursement(c echo.Context) error {
 }
 
 func (r *Rest) GetPayslip(c echo.Context) error {
+	payrollPeriodID, err := strconv.Atoi(c.Param("period_id"))
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
+	}
+
+	userID, err := strconv.Atoi(c.Param("user_id"))
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
+	}
+
+	response, err := r.payrollUc.GetPayslip(int64(userID), int64(payrollPeriodID))
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusInternalServerError, err.Error(), nil)
+	}
+
+	return r.standardizeResponse(c, http.StatusOK, "Success", response)
+}
+
+func (r *Rest) GetPayslips(c echo.Context) error {
+	idParam := c.Param("period_id")
+	periodID, err := strconv.Atoi(idParam)
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
+	}
+
+	response, err := r.payrollUc.GetPayslips(int64(periodID))
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusInternalServerError, err.Error(), nil)
+	}
+
+	return r.standardizeResponse(c, http.StatusOK, "Success", response)
+}
+
+func (r *Rest) GeneratePayroll(c echo.Context) error {
 	userDetail, ok := c.Get("user").(entity.User)
 	if !ok {
 		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
 	}
 
-	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+	idParam := c.Param("period_id")
+	periodID, err := strconv.Atoi(idParam)
 	if err != nil {
 		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
 	}
 
-	payrollPeriodID, err := strconv.Atoi(c.QueryParam("payroll_period_id"))
-	if err != nil {
-		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid payroll period", nil)
-	}
-
-	if userDetail.ID != int64(id) {
-		return r.standardizeResponse(c, http.StatusForbidden, "Access denied: you can only access your own payslip", nil)
-	}
-
-	response, err := r.payrollUc.GetPayslip(userDetail.ID, int64(payrollPeriodID))
+	err = r.payrollUc.ClosePayrollPeriod(userDetail, int64(periodID))
 	if err != nil {
 		return r.standardizeResponse(c, http.StatusInternalServerError, err.Error(), nil)
 	}
 
-	return r.standardizeResponse(c, http.StatusOK, "Reimbursement submitted successfully", response)
+	return r.standardizeResponse(c, http.StatusOK, "Success", nil)
+}
+
+func (r *Rest) GetPayslipBreakdown(c echo.Context) error {
+	userDetail, ok := c.Get("user").(entity.User)
+	if !ok {
+		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
+	}
+
+	idParam := c.Param("period_id")
+	periodID, err := strconv.Atoi(idParam)
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
+	}
+
+	response, err := r.employeeUc.GetPayslipBreakdown(userDetail, int64(periodID))
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusInternalServerError, err.Error(), nil)
+	}
+
+	return r.standardizeResponse(c, http.StatusOK, "Success", response)
 }

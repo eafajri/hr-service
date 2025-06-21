@@ -15,6 +15,8 @@ type EmployeeUseCase interface {
 	SubmitAttendance(userContex entity.User, request entity.SubmitAttendanceRequest) error
 	SubmitOvertime(userContex entity.User, request entity.SubmitOvertimeRequest) error
 	SubmitReimbursement(userContex entity.User, request entity.SubmitReimbursementRequest) error
+
+	GetPayslipBreakdown(userContext entity.User, periodID int64) (any, error)
 }
 
 type EmployeeUseCaseImpl struct {
@@ -32,6 +34,11 @@ func NewEmployeeUseCase(
 	}
 }
 
+/*
+No rules for late or early check-ins or check-outs; check-in at any time that day counts.
+Submissions on the same day should count as one.
+Users cannot submit on weekends.
+*/
 func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request entity.SubmitAttendanceRequest) error {
 	attandanceDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
@@ -73,10 +80,7 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request e
 		return errors.New("invalid check-out time format")
 	}
 
-	// Ensure check-in and check-out times are in same day
-	if checkInTime.Year() != checkOutTime.Year() ||
-		checkInTime.Month() != checkOutTime.Month() ||
-		checkInTime.Day() != checkOutTime.Day() {
+	if !e.isSameDay(checkInTime, checkOutTime) || !e.isSameDay(checkInTime, attandanceDate) {
 		return errors.New("check-in and check-out times must be on the same day")
 	}
 
@@ -94,7 +98,7 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request e
 		UserID:       request.UserID,
 		Date:         attandanceDate,
 		CheckInTime:  checkInTime,
-		CheckOutTime: checkInTime,
+		CheckOutTime: checkOutTime,
 		CreatedBy:    userContex.Username,
 		UpdatedBy:    userContex.Username,
 	}
@@ -114,6 +118,12 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContex entity.User, request e
 	return nil
 }
 
+/*
+Overtime must be proposed after they are done working.
+They can submit the number of hours taken for that overtime.
+Overtime cannot be more than 3 hours per day.
+Overtime can be taken any day.
+*/
 func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request entity.SubmitOvertimeRequest) error {
 	overtimeDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
@@ -182,6 +192,10 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContex entity.User, request ent
 	return nil
 }
 
+/*
+Employees can attach the amount of money that needs to be reimbursed.
+Employees can attach a description to that reimbursement.
+*/
 func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContex entity.User, request entity.SubmitReimbursementRequest) error {
 	reimbursementDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
@@ -224,6 +238,60 @@ func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContex entity.User, reques
 	return nil
 }
 
+func (e *EmployeeUseCaseImpl) GetPayslipBreakdown(userContext entity.User, periodID int64) (any, error) {
+	periodDetails, err := e.payrollRepository.GetPeriodByID(periodID)
+	if err != nil {
+		log.Println(
+			"error when GetPeriodByEntityDate",
+			zap.String("method", "EmployeeUseCaseImpl.isPeriodActive"),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	baseSalaries, err := e.employeeRepository.GetEmployeeBaseSalaryByPeriodStart(periodDetails.PeriodStart, &userContext.ID)
+	if err != nil {
+		log.Println(
+			"error when GetBaseSalaryByUserID",
+			zap.String("method", "EmployeeUseCaseImpl.GetPayslipSummary"),
+			zap.Int64("user_id", userContext.ID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	if len(baseSalaries) != 1 {
+		return nil, errors.New("base salary not found for the user in this period")
+	}
+	baseSalaryDetail := baseSalaries[0]
+
+	attendanceRecords, err := e.employeeRepository.GetAllAttendanceByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	overtimeRecords, err := e.employeeRepository.GetAllOvertimeByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	reimbursementRecords, err := e.employeeRepository.GetAllReimbursementByTimeRange(periodDetails.PeriodStart, periodDetails.PeriodEnd, &userContext.ID)
+	if err != nil {
+		return map[int64][]entity.EmployeeReimbursement{}, err
+	}
+
+	payslip := entity.PayrollPayslip{}
+	payslip.GeneratePayslip(periodDetails, baseSalaryDetail, attendanceRecords, overtimeRecords, reimbursementRecords)
+
+	return map[string]interface{}{
+		"summary":        payslip,
+		"period_detail":  periodDetails,
+		"attendances":    attendanceRecords,
+		"overtimes":      overtimeRecords,
+		"reimbursements": reimbursementRecords,
+	}, nil
+}
+
 func (e *EmployeeUseCaseImpl) isPeriodActive(date time.Time) bool {
 	period, err := e.payrollRepository.GetPeriodByEntityDate(date)
 	if err != nil {
@@ -244,4 +312,10 @@ func (e *EmployeeUseCaseImpl) isPeriodActive(date time.Time) bool {
 	}
 
 	return true
+}
+
+func (e *EmployeeUseCaseImpl) isSameDay(t1, t2 time.Time) bool {
+	return t1.Year() == t2.Year() &&
+		t1.Month() == t2.Month() &&
+		t1.Day() == t2.Day()
 }

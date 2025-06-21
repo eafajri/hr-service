@@ -45,45 +45,73 @@ func (r *EmployeeRepositoryImpl) UpsertReimbursement(reimbursement entity.Employ
 	}).Create(&reimbursement).Error
 }
 
-func (r *EmployeeRepositoryImpl) GetAllAttendanceByTimeRange(startTime time.Time, endTime time.Time) ([]entity.EmployeeAttendance, error) {
+func (r *EmployeeRepositoryImpl) GetAllAttendanceByTimeRange(startTime time.Time, endTime time.Time, userID *int64) ([]entity.EmployeeAttendance, error) {
 	var attendances []entity.EmployeeAttendance
-	err := r.DB.Where("date BETWEEN ? AND ?", startTime, endTime).Find(&attendances).Error
+	query := r.DB.Where("date BETWEEN ? AND ?", startTime, endTime)
+
+	if userID != nil {
+		query = query.Where("user_id = ?", *userID)
+	}
+
+	err := query.Find(&attendances).Error
 	if err != nil {
 		return nil, err
 	}
 	return attendances, nil
 }
 
-func (r *EmployeeRepositoryImpl) GetAllOvertimeByTimeRange(startTime time.Time, endTime time.Time) ([]entity.EmployeeOvertime, error) {
+func (r *EmployeeRepositoryImpl) GetAllOvertimeByTimeRange(startTime time.Time, endTime time.Time, userID *int64) ([]entity.EmployeeOvertime, error) {
 	var overtimes []entity.EmployeeOvertime
-	err := r.DB.Where("date BETWEEN ? AND ?", startTime, endTime).Find(&overtimes).Error
+	query := r.DB.Where("date BETWEEN ? AND ?", startTime, endTime)
+
+	if userID != nil {
+		query = query.Where("user_id = ?", *userID)
+	}
+
+	err := query.Find(&overtimes).Error
 	if err != nil {
 		return nil, err
 	}
+
 	return overtimes, nil
 }
 
-func (r *EmployeeRepositoryImpl) GetAllReimbursementByTimeRange(startTime time.Time, endTime time.Time) ([]entity.EmployeeReimbursement, error) {
+func (r *EmployeeRepositoryImpl) GetAllReimbursementByTimeRange(startTime time.Time, endTime time.Time, userID *int64) ([]entity.EmployeeReimbursement, error) {
 	var reimbursements []entity.EmployeeReimbursement
-	err := r.DB.Where("date BETWEEN ? AND ?", startTime, endTime).Find(&reimbursements).Error
+	query := r.DB.Where("date BETWEEN ? AND ?", startTime, endTime)
+
+	if userID != nil {
+		query = query.Where("user_id = ?", *userID)
+	}
+
+	err := query.Find(&reimbursements).Error
 	if err != nil {
 		return nil, err
 	}
+
 	return reimbursements, nil
 }
 
-func (r *EmployeeRepositoryImpl) GetEmployeeBaseSalaryByPeriodStart(periodStartTime time.Time) ([]entity.EmployeeBaseSalary, error) {
+func (r *EmployeeRepositoryImpl) GetEmployeeBaseSalaryByPeriodStart(periodStartTime time.Time, userID *int64) ([]entity.EmployeeBaseSalary, error) {
 	var salaries []entity.EmployeeBaseSalary
 
-	query := `
+	baseQuery := `
 		SELECT DISTINCT ON (us.user_id) 
-			us.user_id, us.amount
-		FROM users_salaries us
+			us.user_id AS user_id, us.amount AS base_salary
+		FROM user_salaries us
 		WHERE us.effective_from <= ?
-		ORDER BY us.user_id, us.effective_from DESC;
 	`
-	err := r.DB.Raw(query, periodStartTime).Scan(&salaries).Error
 
+	args := []interface{}{periodStartTime}
+
+	if userID != nil {
+		baseQuery += " AND us.user_id = ?"
+		args = append(args, *userID)
+	}
+
+	baseQuery += " ORDER BY us.user_id, us.effective_from DESC;"
+
+	err := r.DB.Raw(baseQuery, args...).Scan(&salaries).Error
 	return salaries, err
 }
 

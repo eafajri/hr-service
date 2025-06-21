@@ -20,11 +20,11 @@ type EmployeeRepository interface {
 
 	GetAttendanceByUserAndDate(userID int64, date time.Time) (entity.EmployeeAttendance, error)
 
-	GetAllAttendanceByTimeRange(startTime time.Time, endTime time.Time) ([]entity.EmployeeAttendance, error)
-	GetAllOvertimeByTimeRange(startTime time.Time, endTime time.Time) ([]entity.EmployeeOvertime, error)
-	GetAllReimbursementByTimeRange(startTime time.Time, endTime time.Time) ([]entity.EmployeeReimbursement, error)
+	GetAllAttendanceByTimeRange(startTime time.Time, endTime time.Time, userID *int64) ([]entity.EmployeeAttendance, error)
+	GetAllOvertimeByTimeRange(startTime time.Time, endTime time.Time, userID *int64) ([]entity.EmployeeOvertime, error)
+	GetAllReimbursementByTimeRange(startTime time.Time, endTime time.Time, userID *int64) ([]entity.EmployeeReimbursement, error)
 
-	GetEmployeeBaseSalaryByPeriodStart(periodStartTime time.Time) ([]entity.EmployeeBaseSalary, error)
+	GetEmployeeBaseSalaryByPeriodStart(periodStartTime time.Time, userID *int64) ([]entity.EmployeeBaseSalary, error)
 }
 
 //go:generate mockery --name PayrollPeriodRepository --output ./mocks

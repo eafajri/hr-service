@@ -1,32 +1,56 @@
-# Context
+# Payslip Generation System API
 
-In a company, there is data that contains employees' salaries. They're paid with the same rule, which is monthly-based, with regular 8 working hours per day (9AM-5PM), 5 days a week (monday-friday). Their take-home pay will be prorated based on their attendance. Along with that, they can also propose overtime, which is paid at twice the prorated salary for hours taken. They can also submit reimbursement requests which will be included in the payslip.
+The system ensures fairness and automation in payroll processing and enables employees to transparently track their monthly earnings. Main features:
+1. Allow employees to submit attendance, overtime, and reimbursement requests securely and reliably.
+2. Enable admins to generate accurate payslips for all employees based on locked attendance and claims.
 
-# Features
 
-As employee:
-- submit attendance
-- submit overtime
-- submit reimbursements
-- generate payslip
+---
 
-As admin
-- run payroll (close the period)
-- generate employee payroll details
+## Features
 
-# First setup
-1. Run docker
-2. Install posgres
-```
-docker pull postgres
-```
-3. Create a new database
-```
-docker run --name postgres_db \
-  -e POSTGRES_USER=admin \
-  -e POSTGRES_PASSWORD=password \
-  -e POSTGRES_DB=hris_db \
-  -p 5432:5432 \
-  -d postgres
-```
-4. Execute migration on cmd/migrations
+- Employee attendance submission (excluding weekends)
+- Overtime submission (up to 3 hours/day)
+- Reimbursement requests with descriptions
+- Admin payroll period management and payroll generation
+- Payslip generation and summary reports for employees and admin
+- Role-based authentication (Admin & Employee)
+- One-time payroll run per payroll period (freezes data)
+
+---
+
+## API Endpoints
+
+### Authentication
+
+All endpoints require **Basic Auth** headers. Admin routes require admin privileges.
+
+---
+
+### Employee APIs (`/private/employee`)
+
+| Endpoint                      | Method | Description                            |
+|-------------------------------|--------|------------------------------------|
+| `/attendance/submit`          | POST   | Submit daily attendance (no weekends) |
+| `/overtime/submit`            | POST   | Submit overtime hours (max 3/day)  |
+| `/reimbursement/submit`       | POST   | Submit reimbursement request        |
+| `/payslips/:period_id`        | GET    | Get payslip breakdown for a payroll period |
+
+---
+
+### Admin APIs (`/private/admin`)
+
+| Endpoint                                 | Method | Description                           |
+|------------------------------------------|--------|-----------------------------------|
+| `/generate-payroll/:period_id`           | POST   | Run payroll process for given period (locks data) |
+| `/payslips/:period_id`                   | GET    | Get summary of all employee payslips for a period |
+| `/payslips/:period_id/:user_id`          | GET    | Get payslip breakdown for specific employee |
+
+---
+
+## Setup & Run
+1. Clone repository
+2. Setup your database and configure connection
+3. Run migrations / seed initial data (users + payroll_periods)
+4. Start the server
+

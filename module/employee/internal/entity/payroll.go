@@ -9,6 +9,11 @@ const (
 	PayrollStatusClosed PayrollPeriodStatus = "closed"
 )
 
+type EmployeeBaseSalary struct {
+	UserID     int64   `json:"user_id"`
+	BaseSalary float64 `json:"base_salary"`
+}
+
 type PayrollPeriod struct {
 	ID          int64               `gorm:"primaryKey" json:"id"`
 	PeriodStart time.Time           `gorm:"type:date;not null" json:"period_start"`
@@ -26,17 +31,17 @@ func (PayrollPeriod) TableName() string {
 }
 
 type PayrollPayslip struct {
-	ID                 int64     `gorm:"primaryKey" json:"id"`
-	UserID             int64     `gorm:"not null;index:idx_user_period,unique" json:"user_id"`
-	PayrollPeriodID    int64     `gorm:"not null;index:idx_user_period,unique" json:"payroll_period_id"`
-	BaseSalary         float64   `gorm:"type:numeric(10,2);not null" json:"base_salary"`
-	AttendanceDays     int       `gorm:"not null" json:"attendance_days"`
-	AttendanceHours    int       `gorm:"not null" json:"attendance_hours"`
-	AttendacePay       float64   `gorm:"type:numeric(10,2);not null" json:"attendance_pay"`
-	OvertimeHours      int       `gorm:"not null" json:"overtime_hours"`
-	OvertimePay        float64   `gorm:"type:numeric(10,2);not null" json:"overtime_pay"`
-	ReimbursementTotal float64   `gorm:"type:numeric(10,2);not null" json:"reimbursement_total"`
-	TotalTakeHome      float64   `gorm:"type:numeric(10,2);not null" json:"total_take_home"`
+	ID                 int64     `gorm:"id" json:"id"`
+	UserID             int64     `gorm:"user_id" json:"user_id"`
+	PayrollPeriodID    int64     `gorm:"payroll_period_id" json:"payroll_period_id"`
+	BaseSalary         float64   `gorm:"base_salary" json:"base_salary"`
+	AttendanceDays     int       `gorm:"attendance_days" json:"attendance_days"`
+	AttendanceHours    int       `gorm:"attendance_hours" json:"attendance_hours"`
+	AttendancePay      float64   `gorm:"attendance_pay" json:"attendance_pay"`
+	OvertimeHours      int       `gorm:"overtime_hours" json:"overtime_hours"`
+	OvertimePay        float64   `gorm:"overtime_pay" json:"overtime_pay"`
+	ReimbursementTotal float64   `gorm:"reimbursement_total" json:"reimbursement_total"`
+	TotalTakeHome      float64   `gorm:"total_take_home" json:"total_take_home"`
 	CreatedAt          time.Time `gorm:"created_at" json:"created_at"`
 	CreatedBy          string    `gorm:"created_by" json:"created_by"`
 }
@@ -45,7 +50,29 @@ func (PayrollPayslip) TableName() string {
 	return "payroll_payslips"
 }
 
-type EmployeeBaseSalary struct {
-	UserID     int64   `json:"user_id"`
-	BaseSalary float64 `json:"base_salary"`
+func (p *PayrollPayslip) GeneratePayslip(periodDetail PayrollPeriod, baseSalaryDetail EmployeeBaseSalary, attendanceRecords []EmployeeAttendance, overtimeRecords []EmployeeOvertime, reimbursementRecords []EmployeeReimbursement) {
+	p.UserID = baseSalaryDetail.UserID
+	p.PayrollPeriodID = periodDetail.ID
+	p.BaseSalary = baseSalaryDetail.BaseSalary
+
+	ratePerDay := baseSalaryDetail.BaseSalary / float64(periodDetail.WorkingDays)
+	ratePerHour := ratePerDay / 8
+
+	p.AttendanceDays = len(attendanceRecords)
+	for _, record := range attendanceRecords {
+		duration := record.CheckOutTime.Sub(record.CheckInTime)
+		p.AttendanceHours += int(duration.Hours())
+	}
+	p.AttendancePay = float64(p.AttendanceHours) * ratePerHour
+
+	for _, record := range overtimeRecords {
+		p.OvertimeHours += record.Durations
+	}
+	p.OvertimePay = float64(p.OvertimeHours) * ratePerHour * 2
+
+	for _, record := range reimbursementRecords {
+		p.ReimbursementTotal += record.Amount
+	}
+
+	p.TotalTakeHome = p.AttendancePay + p.OvertimePay + p.ReimbursementTotal
 }

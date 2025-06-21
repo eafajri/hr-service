@@ -41,12 +41,14 @@ func StartRest(echoInstance *echo.Echo) {
 	employeeApi.POST("/attendance/submit", restHandler.SubmitAttendance)
 	employeeApi.POST("/overtime/submit", restHandler.SubmitOvertime)
 	employeeApi.POST("/reimbursement/submit", restHandler.SubmitReimbursement)
-	employeeApi.GET("/payslip/:id", restHandler.GetPayslip)
+	employeeApi.GET("/payslips/:period_id", restHandler.GetPayslipBreakdown)
 
 	adminApi := echoInstance.Group("/private/admin")
 	adminApi.Use(BasicAuthMiddleware(restHandler.userUc))
 	adminApi.Use(AdminPrevilageMiddleware(restHandler.userUc))
-	adminApi.GET("/payslips/:period_id", restHandler.SubmitReimbursement)
+	adminApi.POST("/generate-payroll/:period_id", restHandler.GeneratePayroll)
+	adminApi.GET("/payslips/:period_id", restHandler.GetPayslips)
+	adminApi.GET("/payslips/:period_id/:user_id", restHandler.GetPayslip)
 }
 
 func (h *Rest) CheckHealth(c echo.Context) error {

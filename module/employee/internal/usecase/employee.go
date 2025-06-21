@@ -317,16 +317,34 @@ func (e *EmployeeUseCaseImpl) GetPayslipBreakdown(userContext entity.UserContext
 		return map[int64][]entity.EmployeeReimbursement{}, err
 	}
 
-	payslip := entity.PayrollPayslip{}
-	payslip.GeneratePayslip(periodDetails, baseSalaryDetail, attendanceRecords, overtimeRecords, reimbursementRecords, userContext.Username)
+	calculatedPayslip := entity.PayrollPayslip{}
+	calculatedPayslip.GeneratePayslip(periodDetails, baseSalaryDetail, attendanceRecords, overtimeRecords, reimbursementRecords, userContext.Username)
 
-	return map[string]interface{}{
-		"summary":        payslip,
-		"period_detail":  periodDetails,
-		"attendances":    attendanceRecords,
-		"overtimes":      overtimeRecords,
-		"reimbursements": reimbursementRecords,
-	}, nil
+	payslipDetails := map[string]interface{}{
+		"payslip_summary_calculated": calculatedPayslip,
+		"period_detail":              periodDetails,
+		"attendances":                attendanceRecords,
+		"overtimes":                  overtimeRecords,
+		"reimbursements":             reimbursementRecords,
+	}
+
+	if periodDetails.Status == "closed" {
+		// collect system generated payslips for closed period.
+		generatedSystemPayslip, err := e.payrollRepository.GetPayslip(userContext.UserID, periodID)
+		if err != nil {
+			log.Println(
+				"error when GetPayslip",
+				zap.String("method", "EmployeeUseCaseImpl.GetPayslipSummary"),
+				zap.Int64("user_id", userContext.UserID),
+				zap.Error(err),
+			)
+			return nil, err
+		}
+
+		payslipDetails["payslip_summary_system_generated"] = generatedSystemPayslip
+	}
+
+	return payslipDetails, nil
 }
 
 func (e *EmployeeUseCaseImpl) isPeriodActive(date time.Time) bool {

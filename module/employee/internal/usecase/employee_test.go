@@ -600,6 +600,29 @@ func Test_EmployeeUseCase_GetPayslipBreakdown(t *testing.T) {
 			wantErr: gorm.ErrInvalidDB,
 		},
 		{
+			name: "error - GetPayslip",
+			mockFunc: func(
+				employeeRepository *mocks.EmployeeRepository,
+				payrollRepository *mocks.PayrollRepository,
+				auditLogRepository *mocks.AuditLogRepository,
+			) {
+				payrollRepository.On("GetPeriodByID", mock.Anything).
+					Return(entity.PayrollPeriod{Status: "closed"}, nil)
+				payrollRepository.On("GetPayslip", mock.Anything, mock.Anything).
+					Return(entity.PayrollPayslip{}, gorm.ErrInvalidDB)
+
+				employeeRepository.On("GetEmployeeBaseSalaryByPeriodStart", mock.Anything, mock.Anything).
+					Return([]entity.EmployeeBaseSalary{{UserID: 1, BaseSalary: 2000}}, nil)
+				employeeRepository.On("GetAllAttendanceByTimeRange", mock.Anything, mock.Anything, mock.Anything).
+					Return([]entity.EmployeeAttendance{}, nil)
+				employeeRepository.On("GetAllOvertimeByTimeRange", mock.Anything, mock.Anything, mock.Anything).
+					Return([]entity.EmployeeOvertime{}, nil)
+				employeeRepository.On("GetAllReimbursementByTimeRange", mock.Anything, mock.Anything, mock.Anything).
+					Return([]entity.EmployeeReimbursement{}, nil)
+			},
+			wantErr: gorm.ErrInvalidDB,
+		},
+		{
 			name: "success",
 			mockFunc: func(
 				employeeRepository *mocks.EmployeeRepository,
@@ -607,7 +630,10 @@ func Test_EmployeeUseCase_GetPayslipBreakdown(t *testing.T) {
 				auditLogRepository *mocks.AuditLogRepository,
 			) {
 				payrollRepository.On("GetPeriodByID", mock.Anything).
-					Return(entity.PayrollPeriod{}, nil)
+					Return(entity.PayrollPeriod{Status: "closed"}, nil)
+				payrollRepository.On("GetPayslip", mock.Anything, mock.Anything).
+					Return(entity.PayrollPayslip{}, nil)
+
 				employeeRepository.On("GetEmployeeBaseSalaryByPeriodStart", mock.Anything, mock.Anything).
 					Return([]entity.EmployeeBaseSalary{{UserID: 1, BaseSalary: 2000}}, nil)
 				employeeRepository.On("GetAllAttendanceByTimeRange", mock.Anything, mock.Anything, mock.Anything).

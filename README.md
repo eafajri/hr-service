@@ -54,3 +54,6 @@ All endpoints require **Basic Auth** headers. Admin routes require admin privile
 3. Run migrations / seed initial data (users + user_salaries + payroll_periods)
 4. Start the server
 
+## Additional Informations
+
+- Read the [wiki](https://github.com/eafajri/hr-service/wiki)

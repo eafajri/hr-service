@@ -341,7 +341,7 @@ func (e *EmployeeUseCaseImpl) GetPayslipBreakdown(userContext entity.UserContext
 			return nil, err
 		}
 
-		payslipDetails["payslip_summary_system_generated"] = generatedSystemPayslip
+		payslipDetails["payslip_summary_admin_generated"] = generatedSystemPayslip
 	}
 
 	return payslipDetails, nil

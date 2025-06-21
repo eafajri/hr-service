@@ -1,105 +1,167 @@
--- ENUM types
 CREATE TYPE user_role AS ENUM ('employee', 'admin');
 CREATE TYPE payroll_periods_status AS ENUM ('open', 'closed');
 
--- Users table
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
-    password TEXT NOT NULL,
-    role user_role NOT NULL
+-- public.audit_logs definition
+
+-- Drop table
+
+-- DROP TABLE public.audit_logs;
+
+CREATE TABLE public.audit_logs (
+	id serial4 NOT NULL,
+	request_id varchar(255) NULL,
+	ip_address varchar(64) NULL,
+	table_name varchar(255) NOT NULL,
+	"action" varchar(255) NOT NULL,
+	"target" varchar(255) NOT NULL,
+	payload jsonb NULL,
+	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_by varchar(255) NOT NULL,
+	CONSTRAINT audit_logs_pkey PRIMARY KEY (id)
 );
 
-CREATE TABLE user_salaries (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    amount NUMERIC(10, 2) NOT NULL,
-    effective_from DATE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+-- public.payroll_periods definition
+
+-- Drop table
+
+-- DROP TABLE public.payroll_periods;
+
+CREATE TABLE public.payroll_periods (
+	id serial4 NOT NULL,
+	period_start date NOT NULL,
+	period_end date NOT NULL,
+	working_days int4 NOT NULL,
+	status public."payroll_periods_status" DEFAULT 'open'::payroll_periods_status NULL,
+	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_by varchar(255) NOT NULL,
+	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	updated_by varchar(255) NOT NULL,
+	CONSTRAINT payroll_periods_period_start_period_end_key UNIQUE (period_start, period_end),
+	CONSTRAINT payroll_periods_pkey PRIMARY KEY (id)
 );
 
--- Attendance table
-CREATE TABLE employee_attendances (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    check_in_time TIMESTAMP NOT NULL,
-    check_out_time TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255) NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_by VARCHAR(255) NOT NULL,
-    UNIQUE (user_id, date)
+
+-- public.users definition
+
+-- Drop table
+
+-- DROP TABLE public.users;
+
+CREATE TABLE public.users (
+	id serial4 NOT NULL,
+	username varchar(255) NOT NULL,
+	"password" text NOT NULL,
+	"role" public."user_role" NOT NULL,
+	CONSTRAINT users_pkey PRIMARY KEY (id)
 );
 
--- Overtime table
-CREATE TABLE employee_overtimes (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    durations INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255) NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_by VARCHAR(255) NOT NULL,
-    UNIQUE(user_id, date)
+
+-- public.employee_attendances definition
+
+-- Drop table
+
+-- DROP TABLE public.employee_attendances;
+
+CREATE TABLE public.employee_attendances (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	"date" date NOT NULL,
+	check_in_time timestamp NOT NULL,
+	check_out_time timestamp NOT NULL,
+	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_by varchar(255) NOT NULL,
+	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	updated_by varchar(255) NOT NULL,
+	CONSTRAINT employee_attendances_pkey PRIMARY KEY (id),
+	CONSTRAINT employee_attendances_user_id_date_key UNIQUE (user_id, date),
+	CONSTRAINT employee_attendances_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
--- Reimbursements table
-CREATE TABLE employee_reimbursements (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    amount NUMERIC(10, 2) DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255) NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_by VARCHAR(255) NOT NULL,
-    description TEXT
-    UNIQUE (user_id, date)
+
+-- public.employee_overtimes definition
+
+-- Drop table
+
+-- DROP TABLE public.employee_overtimes;
+
+CREATE TABLE public.employee_overtimes (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	"date" date NOT NULL,
+	durations int4 NOT NULL,
+	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_by varchar(255) NOT NULL,
+	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	updated_by varchar(255) NOT NULL,
+	CONSTRAINT employee_overtimes_pkey PRIMARY KEY (id),
+	CONSTRAINT employee_overtimes_user_id_date_key UNIQUE (user_id, date),
+	CONSTRAINT employee_overtimes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
--- Payroll periods table
-CREATE TABLE payroll_periods (
-    id SERIAL PRIMARY KEY,
-    period_start DATE NOT NULL,
-    period_end DATE NOT NULL,
-    working_days INT NOT NULL,
-    status payroll_periods_status DEFAULT 'open',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255) NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_by VARCHAR(255) NOT NULL,
-    UNIQUE(period_start, period_end)
+
+-- public.employee_reimbursements definition
+
+-- Drop table
+
+-- DROP TABLE public.employee_reimbursements;
+
+CREATE TABLE public.employee_reimbursements (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	"date" date NOT NULL,
+	amount numeric(10, 2) DEFAULT 0 NULL,
+	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_by varchar(255) NOT NULL,
+	updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	updated_by varchar(255) NOT NULL,
+	description text NULL,
+	CONSTRAINT employee_reimbursements_pkey PRIMARY KEY (id),
+	CONSTRAINT unique_user_date UNIQUE (user_id, date),
+	CONSTRAINT employee_reimbursements_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
--- Payslips table
-CREATE TABLE payroll_payslips (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    payroll_period_id INT NOT NULL REFERENCES payroll_periods(id) ON DELETE CASCADE,
-    base_salary NUMERIC(10, 2) NOT NULL,
-    attendance_days INT NOT NULL,
-    attendance_hours INT NOT NULL,
-    attendance_pay NUMERIC(10, 2) NOT NULL,
-    overtime_hours INT NOT NULL,
-    overtime_pay NUMERIC(10, 2) NOT NULL,
-    reimbursement_total NUMERIC(10, 2) NOT NULL,
-    total_take_home NUMERIC(10, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255) NOT NULL,
-    UNIQUE(user_id, payroll_period_id)
+
+-- public.payroll_payslips definition
+
+-- Drop table
+
+-- DROP TABLE public.payroll_payslips;
+
+CREATE TABLE public.payroll_payslips (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	payroll_period_id int4 NOT NULL,
+	base_salary numeric(10, 2) NOT NULL,
+	attendance_days int4 NOT NULL,
+	attendance_hours int4 NOT NULL,
+	attendance_pay numeric(10, 2) NOT NULL,
+	overtime_hours int4 NOT NULL,
+	overtime_pay numeric(10, 2) NOT NULL,
+	reimbursement_total numeric(10, 2) NOT NULL,
+	total_take_home numeric(10, 2) NOT NULL,
+	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_by varchar(255) NOT NULL,
+	CONSTRAINT payroll_payslips_pkey PRIMARY KEY (id),
+	CONSTRAINT payroll_payslips_user_id_payroll_period_id_key UNIQUE (user_id, payroll_period_id),
+	CONSTRAINT payroll_payslips_payroll_period_id_fkey FOREIGN KEY (payroll_period_id) REFERENCES public.payroll_periods(id) ON DELETE CASCADE,
+	CONSTRAINT payroll_payslips_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
--- Audit logs table
-CREATE TABLE audit_logs (
-    id SERIAL PRIMARY KEY,
-    request_id UUID,
-    ip_address VARCHAR(64),
-    table_name VARCHAR(255) NOT NULL,
-    action VARCHAR(255) NOT NULL,
-    target VARCHAR(255) NOT NULL,
-    payload JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255) NOT NULL
+
+-- public.user_salaries definition
+
+-- Drop table
+
+-- DROP TABLE public.user_salaries;
+
+CREATE TABLE public.user_salaries (
+	id serial4 NOT NULL,
+	user_id int4 NOT NULL,
+	amount numeric(10, 2) NOT NULL,
+	effective_from date NOT NULL,
+	created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
+	created_by varchar(255) NULL,
+	CONSTRAINT user_salaries_pkey PRIMARY KEY (id),
+	CONSTRAINT user_salaries_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );

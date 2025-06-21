@@ -50,7 +50,7 @@ All endpoints require **Basic Auth** headers. Admin routes require admin privile
 
 ## Setup & Run
 1. Clone repository
-2. Setup your database and configure connection
-3. Run migrations / seed initial data (users + payroll_periods)
+2. Setup database (posgres) and configure connection
+3. Run migrations / seed initial data (users + user_salaries + payroll_periods)
 4. Start the server
 

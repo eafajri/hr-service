@@ -47,7 +47,8 @@ func StartRest(echoInstance *echo.Echo) {
 	adminApi := echoInstance.Group("/private/admin")
 	adminApi.Use(BasicAuthMiddleware(restHandler.userUc))
 	adminApi.Use(AdminPrevilageMiddleware(restHandler.userUc))
-	adminApi.POST("/generate-payroll/:period_id", restHandler.GeneratePayroll)
+	adminApi.POST("/payroll/period/close/:period_id", restHandler.ClosePayrollPeriod)
+	adminApi.POST("/payroll/generate/:period_id", restHandler.GeneratePayroll)
 	adminApi.GET("/payslips/:period_id", restHandler.GetPayslips)
 	adminApi.GET("/payslips/:period_id/:user_id", restHandler.GetPayslip)
 }

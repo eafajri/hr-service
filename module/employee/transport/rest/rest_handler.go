@@ -99,26 +99,6 @@ func (r *Rest) GetPayslips(c echo.Context) error {
 	return r.standardizeResponse(c, http.StatusOK, "Success", response)
 }
 
-func (r *Rest) GeneratePayroll(c echo.Context) error {
-	userDetail, ok := c.Get("user_context").(entity.UserContext)
-	if !ok {
-		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
-	}
-
-	idParam := c.Param("period_id")
-	periodID, err := strconv.Atoi(idParam)
-	if err != nil {
-		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
-	}
-
-	err = r.payrollUc.ClosePayrollPeriod(userDetail, int64(periodID))
-	if err != nil {
-		return r.standardizeResponse(c, http.StatusInternalServerError, err.Error(), nil)
-	}
-
-	return r.standardizeResponse(c, http.StatusOK, "Success", nil)
-}
-
 func (r *Rest) GetPayslipBreakdown(c echo.Context) error {
 	userDetail, ok := c.Get("user_context").(entity.UserContext)
 	if !ok {
@@ -137,4 +117,44 @@ func (r *Rest) GetPayslipBreakdown(c echo.Context) error {
 	}
 
 	return r.standardizeResponse(c, http.StatusOK, "Success", response)
+}
+
+func (r *Rest) GeneratePayroll(c echo.Context) error {
+	userDetail, ok := c.Get("user_context").(entity.UserContext)
+	if !ok {
+		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
+	}
+
+	idParam := c.Param("period_id")
+	periodID, err := strconv.Atoi(idParam)
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
+	}
+
+	err = r.payrollUc.GeneratePayslipsByPeriodID(userDetail, int64(periodID))
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusInternalServerError, err.Error(), nil)
+	}
+
+	return r.standardizeResponse(c, http.StatusOK, "Success", nil)
+}
+
+func (r *Rest) ClosePayrollPeriod(c echo.Context) error {
+	userDetail, ok := c.Get("user_context").(entity.UserContext)
+	if !ok {
+		return r.standardizeResponse(c, http.StatusUnauthorized, "User ID not found in context", nil)
+	}
+
+	idParam := c.Param("period_id")
+	periodID, err := strconv.Atoi(idParam)
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusBadRequest, "Invalid ID format", nil)
+	}
+
+	err = r.payrollUc.ClosePayrollPeriod(userDetail, int64(periodID))
+	if err != nil {
+		return r.standardizeResponse(c, http.StatusInternalServerError, err.Error(), nil)
+	}
+
+	return r.standardizeResponse(c, http.StatusOK, "Success", nil)
 }

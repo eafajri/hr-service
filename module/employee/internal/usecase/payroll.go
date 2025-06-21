@@ -3,7 +3,6 @@ package usecase
 import (
 	"errors"
 	"log"
-	"time"
 
 	"github.com/eafajri/hr-service.git/module/employee/internal/entity"
 	"go.uber.org/zap"
@@ -14,6 +13,7 @@ type PayrollUseCase interface {
 	GetPayslip(userID int64, periodID int64) (entity.PayrollPayslip, error)
 	GetPayslips(periodID int64) ([]entity.PayrollPayslip, error)
 	ClosePayrollPeriod(userContex entity.UserContext, periodID int64) error
+	GeneratePayslipsByPeriodID(userContext entity.UserContext, periodID int64) error
 }
 
 type PayrollUseCaseImpl struct {
@@ -71,19 +71,19 @@ The summary contains take-home pay of each employee.
 The summary contains the total take-home pay of all employees.
 */
 func (p *PayrollUseCaseImpl) GetPayslips(periodID int64) ([]entity.PayrollPayslip, error) {
-	if periodID == 0 {
-		period, err := p.payrollRepository.GetPeriodByEntityDate(time.Now())
-		if err != nil {
-			log.Println(
-				"error when GetPeriodByEntityDate",
-				zap.String("method", "PayrollUseCaseImpl.GetPayslips"),
-				zap.Int64("period_id", periodID),
-				zap.Error(err),
-			)
-			return nil, err
-		}
+	payrollPeriod, err := p.payrollRepository.GetPeriodByID(periodID)
+	if err != nil {
+		log.Println(
+			"error when GetPeriodByID",
+			zap.String("method", "PayrollUseCaseImpl.GetPayslip"),
+			zap.Int64("period_id", periodID),
+			zap.Error(err),
+		)
+		return []entity.PayrollPayslip{}, err
+	}
 
-		periodID = period.ID
+	if payrollPeriod.Status == "open" {
+		return []entity.PayrollPayslip{}, errors.New("the payroll period is still open")
 	}
 
 	payslips, err := p.payrollRepository.GetPayslips(periodID)
@@ -121,8 +121,8 @@ func (p *PayrollUseCaseImpl) ClosePayrollPeriod(userContext entity.UserContext, 
 		return err
 	}
 
-	if payrollPeriod.Status != "open" {
-		return errors.New("the payroll period is not open")
+	if payrollPeriod.Status == "closed" {
+		return errors.New("the payroll period is already closed")
 	}
 
 	err = p.payrollRepository.ClosePayrollPeriod(periodID)
@@ -136,7 +136,7 @@ func (p *PayrollUseCaseImpl) ClosePayrollPeriod(userContext entity.UserContext, 
 		return err
 	}
 
-	go p.auditLogRepository.Create(entity.AuditLog{
+	p.auditLogRepository.Create(entity.AuditLog{
 		RequestID: userContext.RequestID,
 		IPAddress: userContext.IPAddress,
 		Action:    "update",
@@ -145,12 +145,10 @@ func (p *PayrollUseCaseImpl) ClosePayrollPeriod(userContext entity.UserContext, 
 		CreatedBy: userContext.Username,
 	}, payrollPeriod)
 
-	go p.createPayslipsByPeriodID(userContext, periodID)
-
 	return err
 }
 
-func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(userContext entity.UserContext, periodID int64) error {
+func (p *PayrollUseCaseImpl) GeneratePayslipsByPeriodID(userContext entity.UserContext, periodID int64) error {
 	periodDetails, err := p.payrollRepository.GetPeriodByID(periodID)
 	if err != nil {
 		log.Println(
@@ -160,6 +158,10 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(userContext entity.UserCon
 			zap.Error(err),
 		)
 		return err
+	}
+
+	if periodDetails.Status == "open" {
+		return errors.New("unable to process open period")
 	}
 
 	employeeBaseSalaries, err := p.employeeRepository.GetEmployeeBaseSalaryByPeriodStart(periodDetails.PeriodStart, nil)
@@ -225,7 +227,7 @@ func (p *PayrollUseCaseImpl) createPayslipsByPeriodID(userContext entity.UserCon
 		return err
 	}
 
-	go p.auditLogRepository.Create(entity.AuditLog{
+	p.auditLogRepository.Create(entity.AuditLog{
 		RequestID: userContext.RequestID,
 		IPAddress: userContext.IPAddress,
 		Action:    "create",

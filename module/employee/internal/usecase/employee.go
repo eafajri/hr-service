@@ -122,7 +122,7 @@ func (e *EmployeeUseCaseImpl) SubmitAttendance(userContext entity.UserContext, r
 		return err
 	}
 
-	go e.auditLogRepository.Create(entity.AuditLog{
+	e.auditLogRepository.Create(entity.AuditLog{
 		RequestID: userContext.RequestID,
 		IPAddress: userContext.IPAddress,
 		Action:    "submit",
@@ -141,6 +141,10 @@ Overtime cannot be more than 3 hours per day.
 Overtime can be taken any day.
 */
 func (e *EmployeeUseCaseImpl) SubmitOvertime(userContext entity.UserContext, request entity.SubmitOvertimeRequest) error {
+	if userContext.UserID != request.UserID {
+		return errors.New("user context does not match request user ID")
+	}
+
 	overtimeDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
 		log.Println(
@@ -160,7 +164,7 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContext entity.UserContext, req
 	// When weekdays, It need to ensure that attendance is submitted
 	shouldCheckAttendance := overtimeDate.Weekday() != time.Saturday || overtimeDate.Weekday() != time.Sunday
 	if shouldCheckAttendance {
-		attendance, err := e.employeeRepository.GetAttendanceByUserAndDate(request.UserID, overtimeDate)
+		_, err := e.employeeRepository.GetAttendanceByUserAndDate(request.UserID, overtimeDate)
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return errors.New("attendance must be submitted before submitting overtime")
@@ -173,10 +177,6 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContext entity.UserContext, req
 				zap.Error(err),
 			)
 			return err
-		}
-
-		if attendance.ID == 0 {
-			return errors.New("attendance must be submitted before submitting overtime")
 		}
 	}
 
@@ -205,7 +205,7 @@ func (e *EmployeeUseCaseImpl) SubmitOvertime(userContext entity.UserContext, req
 		return err
 	}
 
-	go e.auditLogRepository.Create(entity.AuditLog{
+	e.auditLogRepository.Create(entity.AuditLog{
 		RequestID: userContext.RequestID,
 		IPAddress: userContext.IPAddress,
 		Action:    "submit",
@@ -222,6 +222,10 @@ Employees can attach the amount of money that needs to be reimbursed.
 Employees can attach a description to that reimbursement.
 */
 func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContext entity.UserContext, request entity.SubmitReimbursementRequest) error {
+	if userContext.UserID != request.UserID {
+		return errors.New("user context does not match request user ID")
+	}
+
 	reimbursementDate, err := time.Parse("2006-01-02", request.Date)
 	if err != nil {
 		log.Println(
@@ -239,7 +243,6 @@ func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContext entity.UserContext
 	}
 
 	reimbursement := entity.EmployeeReimbursement{
-
 		UserID:      request.UserID,
 		Date:        reimbursementDate,
 		Amount:      request.Amount,
@@ -260,7 +263,7 @@ func (e *EmployeeUseCaseImpl) SubmitReimbursement(userContext entity.UserContext
 		return err
 	}
 
-	go e.auditLogRepository.Create(entity.AuditLog{
+	e.auditLogRepository.Create(entity.AuditLog{
 		RequestID: userContext.RequestID,
 		IPAddress: userContext.IPAddress,
 		Action:    "submit",
@@ -334,10 +337,6 @@ func (e *EmployeeUseCaseImpl) isPeriodActive(date time.Time) bool {
 			zap.String("method", "EmployeeUseCaseImpl.isPeriodActive"),
 			zap.Error(err),
 		)
-		return false
-	}
-
-	if period.ID == 0 {
 		return false
 	}
 

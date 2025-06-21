@@ -27,7 +27,7 @@ type EmployeeRepository interface {
 	GetEmployeeBaseSalaryByPeriodStart(periodStartTime time.Time, userID *int64) ([]entity.EmployeeBaseSalary, error)
 }
 
-//go:generate mockery --name PayrollPeriodRepository --output ./mocks
+//go:generate mockery --name PayrollRepository --output ./mocks
 type PayrollRepository interface {
 	GetPeriodByID(periodID int64) (entity.PayrollPeriod, error)
 	GetPeriodByEntityDate(date time.Time) (entity.PayrollPeriod, error)

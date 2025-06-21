@@ -11,9 +11,9 @@ const (
 
 type User struct {
 	ID       int64    `gorm:"primaryKey" json:"id"`
-	Username string   `gorm:"size:255;not null" json:"name"`
-	Password string   `gorm:"not null" json:"password"`
-	Role     UserRole `gorm:"type:user_role;not null" json:"role"`
+	Username string   `gorm:"username" json:"username"`
+	Password string   `gorm:"password" json:"password"`
+	Role     UserRole `gorm:"role" json:"role"`
 }
 
 func (EmployeeAttendance) User() string {

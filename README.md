@@ -42,7 +42,8 @@ All endpoints require **Basic Auth** headers. Admin routes require admin privile
 
 | Endpoint                                 | Method | Description                           |
 |------------------------------------------|--------|-----------------------------------|
-| `/generate-payroll/:period_id`           | POST   | Run payroll process for given period (locks data) |
+| `/payroll/period/close/:period_id`       | POST   | Close a payroll period (locks data) |
+| `/payroll/generate/:period_id`           | POST   | Generate all employee payrolls for given period |
 | `/payslips/:period_id`                   | GET    | Get summary of all employee payslips for a period |
 | `/payslips/:period_id/:user_id`          | GET    | Get payslip breakdown for specific employee |
 
@@ -51,8 +52,9 @@ All endpoints require **Basic Auth** headers. Admin routes require admin privile
 ## Setup & Run
 1. Clone repository
 2. Setup database (posgres) and configure connection
-3. Run migrations / seed initial data (users + user_salaries + payroll_periods)
+3. Run migrations / seed initial data (on `./database/migrations/initial_test_data`)
 4. Start the server
+5. Healt check `curl --location --request GET 'http://localhost:8080/public/check' --header 'Content-Type: application/json'`
 
 ## Additional Informations
 
